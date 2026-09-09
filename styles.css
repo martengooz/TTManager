@@ -471,7 +471,15 @@ textarea { resize: vertical; }
 .score-input { text-align: center; font-size: 1.05rem; font-variant-numeric: tabular-nums; padding: 0.45rem; }
 .score-input::-webkit-outer-spin-button, .score-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .score-input { -moz-appearance: textfield; }
-.dialog__status { margin: 0.9rem 0 0; font-size: 0.86rem; color: var(--muted); min-height: 1.2em; }
+.score-input.is-auto {
+  background: var(--accent-soft);
+  border-color: #b9d4ee;
+  color: var(--accent);
+}
+.setrow.is-inactive { opacity: 0.35; }
+.setrow.is-inactive .score-input { background: var(--surface-2); }
+.dialog__hint { margin: 0.8rem 0 0; font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+.dialog__status { margin: 0.5rem 0 0; font-size: 0.86rem; color: var(--muted); min-height: 1.2em; }
 .dialog__status.is-error { color: var(--danger); }
 .dialog__status.is-ok { color: var(--win); font-weight: 600; }
 .dialog__foot {
