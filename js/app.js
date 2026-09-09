@@ -1,7 +1,7 @@
 /* Router, shared state and the score entry dialog. */
 import * as store from "./store.js";
 import * as model from "./model.js";
-import { $, html, raw, esc, on, download, slugify, formatDate } from "./util.js";
+import { $, html, raw, esc, on, download, slugify, formatDate, APP_VERSION } from "./util.js";
 import * as home from "./views/home.js";
 import * as setup from "./views/setup.js";
 import * as matches from "./views/matches.js";
@@ -492,8 +492,27 @@ function watchInstall() {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+
+  // A worker taking over a page that already had one means a new version is in
+  // charge, and the running code is now older than the files being served.
+  // Reload once so a bumped version lands without closing the app - but never
+  // in the middle of typing a score.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    const dialog = $("#score-dialog");
+    if (!hadController || reloading || (dialog && dialog.open)) return;
+    reloading = true;
+    location.reload();
+  });
+
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register(new URL("../sw.js", import.meta.url), { scope: "./" }).catch((error) => {
+    // The version in the URL makes a new release a different script to the
+    // browser, so the update is picked up even where imported scripts are not
+    // part of the update check.
+    const url = new URL("../sw.js", import.meta.url);
+    url.searchParams.set("v", APP_VERSION);
+    navigator.serviceWorker.register(url, { scope: "./" }).catch((error) => {
       console.warn("Service worker registration failed", error);
     });
   });

@@ -238,6 +238,7 @@ a { color: inherit; }
 .tlist__status { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 .tlist__actions { display: flex; gap: 0.2rem; margin-left: auto; }
 .home__foot { padding: 1.4rem 0; font-size: 0.85rem; max-width: 70ch; }
+.home__version { display: block; margin-top: 0.4rem; font-variant-numeric: tabular-nums; opacity: 0.75; }
 
 /* ---------------------------------------------------------------- Forms */
 
