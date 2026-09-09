@@ -53,8 +53,10 @@ npx http-server . -p 8080     # or: python3 -m http.server 8080
 
 Then visit <http://localhost:8080>.
 
-To publish it, push the repository and turn on GitHub Pages for the branch — the app is the
-repository root and uses only relative paths, so it works from a subdirectory too.
+It is published with GitHub Pages: in **Settings → Pages**, set *Source* to **GitHub Actions**.
+After that every push to `main` deploys the repository root through `.github/workflows/pages.yml`.
+The app uses only relative paths, so it works from the `/TTManager/` subpath just as it does from
+a domain root.
 
 ## Layout
 

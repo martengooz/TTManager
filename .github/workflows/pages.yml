@@ -24,10 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # enablement turns Pages on for the repository if it is not already.
+      # Pages must already be on for the repository, with the source set to
+      # "GitHub Actions" (Settings -> Pages). The workflow token is not
+      # permitted to create the Pages site itself.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       # The app is static and lives at the repository root, so it ships as is.
       - uses: actions/upload-pages-artifact@v3
