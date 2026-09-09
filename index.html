@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>TT Manager — table tennis tournaments</title>
+    <meta name="description" content="Set up a table tennis tournament, record every match score and print the whole thing. Works offline." />
+    <meta name="theme-color" content="#0f5ea8" />
+    <meta name="color-scheme" content="light" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="TT Manager" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-view="home">
+    <div id="app"></div>
+    <dialog id="score-dialog" class="dialog"></dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <noscript>
+      <p style="padding: 2rem; font-family: system-ui">TT Manager needs JavaScript to run.</p>
+    </noscript>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

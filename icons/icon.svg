@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="TT Manager">
+  <rect width="512" height="512" rx="112" fill="#0f5ea8" />
+  <line x1="287" y1="287" x2="410" y2="410" stroke="#deb26c" stroke-width="87" stroke-linecap="round" />
+  <circle cx="225" cy="225" r="132" fill="#ffffff" />
+  <circle cx="225" cy="225" r="120" fill="#ff6b2c" />
+  <circle cx="387" cy="146" r="44" fill="#ffffff" />
+</svg>

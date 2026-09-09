@@ -1,0 +1,22 @@
+{
+  "name": "TT Manager — table tennis tournaments",
+  "short_name": "TT Manager",
+  "description": "Set up a table tennis tournament, record every match score and print the whole thing. Works offline.",
+  "start_url": ".",
+  "scope": ".",
+  "id": "ttmanager",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef1f5",
+  "theme_color": "#0f5ea8",
+  "categories": ["sports", "productivity", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "New tournament", "url": "index.html#/", "description": "Start setting up a tournament" }
+  ]
+}
