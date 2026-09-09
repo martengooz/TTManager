@@ -1,5 +1,5 @@
 /* Offline shell for TT Manager. Bump CACHE when the app files change. */
-const CACHE = "ttmanager-v1";
+const CACHE = "ttmanager-v2";
 
 const ASSETS = [
   "./",

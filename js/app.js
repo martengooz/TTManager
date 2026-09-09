@@ -74,16 +74,23 @@ function chrome(tournament, view) {
     </header>`;
 }
 
-/** Re-renders the current screen without jumping back to the top. */
+/** Re-renders the current screen. Scroll handling lives in render itself. */
 export function rerenderView() {
-  const y = window.scrollY;
   render();
-  window.scrollTo({ top: y });
 }
+
+/* Moving to another screen starts at the top; redrawing the screen you are
+   already on keeps you where you were, so adding a player or saving a score
+   does not throw you back up the page. */
+let lastScreen = null;
 
 export function render() {
   const route = parseHash();
   const app = $("#app");
+  const scrollY = window.scrollY;
+  const screen = `${route.id || "home"}/${route.id ? route.view : ""}`;
+  const sameScreen = screen === lastScreen;
+  lastScreen = screen;
 
   if (!route.id) {
     state.tournament = null;
@@ -92,6 +99,7 @@ export function render() {
     document.body.dataset.view = "home";
     document.title = "TT Manager";
     if (home.afterRender) home.afterRender();
+    restoreScroll(sameScreen, scrollY);
     return;
   }
 
@@ -110,7 +118,11 @@ export function render() {
   document.body.dataset.view = state.view;
   document.title = `${tournament.name} · TT Manager`;
   if (view.afterRender) view.afterRender(tournament);
-  window.scrollTo({ top: 0 });
+  restoreScroll(sameScreen, scrollY);
+}
+
+function restoreScroll(sameScreen, scrollY) {
+  window.scrollTo({ top: sameScreen ? scrollY : 0, behavior: "auto" });
 }
 
 /* ------------------------------------------------------------------ *
