@@ -16,11 +16,34 @@
   --win: #0b7a45;
   --win-soft: #e6f5ec;
   --danger: #b42318;
+  /* Spacing that the view setting scales. */
+  --card-pad: 0.75rem 0.85rem;
+  --card-gap: 0.6rem;
+  --grid-gap: 0.4rem;
+  --match-pad: 0.35rem 0.5rem 0.4rem;
+  --match-min: 215px;
+  --row-pad: 0.12rem;
+  --cell-pad: 0.28rem 0.4rem;
+  --field-gap: 0.55rem;
   --radius: 14px;
   --radius-sm: 9px;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px -12px rgba(16, 24, 40, 0.18);
   --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* Standard view: the same layout with room to breathe. */
+body[data-density="comfortable"] {
+  --card-pad: 1.1rem 1.2rem;
+  --card-gap: 1rem;
+  --grid-gap: 0.7rem;
+  --match-pad: 0.6rem 0.7rem;
+  --match-min: 250px;
+  --row-pad: 0.4rem;
+  --cell-pad: 0.45rem 0.55rem;
+  --field-gap: 0.85rem;
+  font-size: 15.5px;
+  line-height: 1.55;
 }
 
 * { box-sizing: border-box; }
@@ -127,8 +150,8 @@ a { color: inherit; }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 0.75rem 0.85rem;
-  margin-bottom: 0.6rem;
+  padding: var(--card-pad);
+  margin-bottom: var(--card-gap);
 }
 .card__title {
   display: flex;
@@ -149,7 +172,7 @@ a { color: inherit; }
 .card__foot { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.7rem; }
 .card--info { padding: 0.9rem 1rem; margin: 0; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.5rem; }
-.grid { display: grid; gap: 0.6rem; }
+.grid { display: grid; gap: var(--card-gap); }
 .grid--setup { grid-template-columns: 1fr; }
 .grid--tables { grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); }
 @media (min-width: 900px) {
@@ -319,7 +342,7 @@ a { color: inherit; }
 
 /* ---------------------------------------------------------------- Forms */
 
-.field { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.55rem; }
+.field { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: var(--field-gap); }
 .field label { font-size: 0.83rem; font-weight: 600; color: var(--muted); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 
@@ -377,7 +400,7 @@ textarea { resize: vertical; }
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.12rem 0;
+  padding: var(--row-pad) 0;
   border-top: 1px solid var(--line);
 }
 .players__row:first-child { border-top: 0; }
@@ -443,12 +466,12 @@ textarea { resize: vertical; }
 .toolbar::-webkit-scrollbar { display: none; }
 .toolbar .chip { flex: none; }
 .toolbar__sep { width: 1px; height: 1.1rem; background: var(--line); flex: none; margin: 0 0.2rem; }
-.matchgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 0.4rem; }
+.matchgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--match-min), 1fr)); gap: var(--grid-gap); }
 
 .match {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  padding: 0.35rem 0.5rem 0.4rem;
+  padding: var(--match-pad);
   background: var(--surface);
   display: flex;
   flex-direction: column;
@@ -504,7 +527,7 @@ textarea { resize: vertical; }
   font-weight: 650;
   margin: 0 0 0.45rem;
 }
-.table th, .table td { padding: 0.28rem 0.4rem; border-bottom: 1px solid var(--line); text-align: left; }
+.table th, .table td { padding: var(--cell-pad); border-bottom: 1px solid var(--line); text-align: left; }
 .table thead th {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -782,3 +805,33 @@ textarea { resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ---------------------------------------------------------------- Settings */
+
+.setting { margin-bottom: 1rem; }
+.setting:last-child { margin-bottom: 0; }
+.setting h3 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+.setting .segmented { margin-bottom: 0.3rem; }
+.switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.switch input {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.1rem;
+  flex: none;
+  accent-color: var(--accent);
+}
+.switch small { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 0.1rem; }
+#settings-dialog .dialog__foot { justify-content: space-between; }

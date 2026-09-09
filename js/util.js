@@ -1,4 +1,5 @@
 /* Small DOM + misc helpers. No dependencies, no build step. */
+import { locale } from "./i18n.js";
 
 /** Set by version.js, which loads before this module. */
 export const APP_VERSION = globalThis.APP_VERSION || "dev";
@@ -55,7 +56,7 @@ export function formatDate(value) {
   if (!value) return "";
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  return date.toLocaleDateString(locale(), { year: "numeric", month: "long", day: "numeric" });
 }
 
 export function download(filename, text) {

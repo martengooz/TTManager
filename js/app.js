@@ -1,5 +1,7 @@
 /* Router, shared state and the score entry dialog. */
 import * as store from "./store.js";
+import * as settings from "./settings.js";
+import { t, LANGUAGES, currentLanguage } from "./i18n.js";
 import * as model from "./model.js";
 import { $, $$, html, raw, esc, on, download, slugify, formatDate, APP_VERSION } from "./util.js";
 import * as home from "./views/home.js";
@@ -11,15 +13,10 @@ import * as printView from "./views/print.js";
 import { sideName } from "./components.js";
 
 const VIEWS = { setup, matches, standings, bracket, print: printView };
-const TABS = [
-  { id: "setup", label: "Setup" },
-  { id: "matches", label: "Matches" },
-  { id: "standings", label: "Standings" },
-  { id: "bracket", label: "Bracket" },
-  { id: "print", label: "Print" },
-];
+const TABS = ["setup", "matches", "standings", "bracket", "print"];
+const TAB_LABELS = { setup: "Setup", matches: "Matches", standings: "Standings", bracket: "Bracket", print: "Print" };
 
-export const state = { tournament: null, view: "home", filter: "all", groupFilter: "all" };
+export const state = { tournament: null, view: "home", filter: "all", groupFilter: "all", search: "" };
 
 export function save() {
   if (state.tournament) store.save(state.tournament);
@@ -47,29 +44,30 @@ function parseHash() {
 function chrome(tournament, view) {
   const p = model.progress(tournament);
   const showBracket = tournament.matches.some((m) => m.stage === "ko");
-  const tabs = TABS.filter((tab) => tab.id !== "bracket" || showBracket);
+  const tabs = TABS.filter((tab) => tab !== "bracket" || showBracket);
   return html`<header class="topbar">
       <div class="topbar__row">
-        <a class="iconbtn" href="#/" title="All tournaments" aria-label="All tournaments">‹</a>
+        <a class="iconbtn" href="#/" title="${t("All tournaments")}" aria-label="${t("All tournaments")}">‹</a>
         <h1 class="topbar__name" title="${tournament.name}">${tournament.name}</h1>
         ${raw(
           p.total
-            ? `<button type="button" class="topbar__count" data-action="next-match" title="${p.done} of ${p.total} played — tap for the next result">${p.done}/${p.total}</button>`
+            ? `<button type="button" class="topbar__count" data-action="show-todo" title="${esc(t("{done} of {total} played — tap to see what is left", { done: p.done, total: p.total }))}">${p.done}/${p.total}</button>`
             : ""
         )}
         <details class="menu">
-          <summary class="iconbtn" title="More" aria-label="More actions">⋯</summary>
+          <summary class="iconbtn" title="${t("More")}" aria-label="${t("More actions")}">⋯</summary>
           <div class="menu__list">
-            <a class="menu__item" href="#/t/${tournament.id}/print">Print / Save as PDF</a>
-            <button type="button" class="menu__item" data-action="export">Export as JSON</button>
-            <button type="button" class="menu__item" data-action="duplicate-current">Duplicate tournament</button>
-            <button type="button" class="menu__item menu__item--danger" data-action="delete-current">Delete tournament</button>
+            <a class="menu__item" href="#/t/${tournament.id}/print">${t("Print / Save as PDF")}</a>
+            <button type="button" class="menu__item" data-action="export">${t("Export as JSON")}</button>
+            <button type="button" class="menu__item" data-action="duplicate-current">${t("Duplicate tournament")}</button>
+            <button type="button" class="menu__item" data-action="settings">${t("Settings")}</button>
+            <button type="button" class="menu__item menu__item--danger" data-action="delete-current">${t("Delete tournament")}</button>
           </div>
         </details>
       </div>
       <nav class="tabs">
         ${tabs.map(
-          (tab) => html`<a class="tab${raw(tab.id === view ? " is-active" : "")}" href="#/t/${tournament.id}/${tab.id}">${tab.label}</a>`
+          (tab) => html`<a class="tab${raw(tab === view ? " is-active" : "")}" href="#/t/${tournament.id}/${tab}">${t(TAB_LABELS[tab])}</a>`
         )}
       </nav>
       <div class="progress" aria-hidden="true"><div class="progress__bar" style="width:${p.pct}%"></div></div>
@@ -141,45 +139,53 @@ export function openScoreDialog(matchId) {
 
   const dialog = $("#score-dialog");
   const maxSets = tournament.settings.bestOf;
-  const next = nextPlayable(matchId);
+  const next = settings.get().chainNext ? nextPlayable(matchId) : null;
   const remaining = model.upcomingMatches(tournament).filter((m) => m.id !== matchId).length;
   const rows = Array.from({ length: maxSets }, (_, i) => {
     const set = match.sets[i] || ["", ""];
     return html`<div class="setrow">
-      <label class="setrow__label">Set ${i + 1}</label>
-      <input class="score-input" type="number" min="0" max="99" inputmode="numeric" data-set="${i}" data-side="0" value="${set[0]}" aria-label="Set ${i + 1}, ${model.playerName(tournament, match.p1)}" />
+      <label class="setrow__label">${t("Set {n}", { n: i + 1 })}</label>
+      <input class="score-input" type="number" min="0" max="99" inputmode="numeric" data-set="${i}" data-side="0" value="${set[0]}" aria-label="${t("Set {n}, {player}", { n: i + 1, player: model.playerName(tournament, match.p1) })}" />
       <span class="setrow__dash">–</span>
-      <input class="score-input" type="number" min="0" max="99" inputmode="numeric" data-set="${i}" data-side="1" value="${set[1]}" aria-label="Set ${i + 1}, ${model.playerName(tournament, match.p2)}" />
+      <input class="score-input" type="number" min="0" max="99" inputmode="numeric" data-set="${i}" data-side="1" value="${set[1]}" aria-label="${t("Set {n}, {player}", { n: i + 1, player: model.playerName(tournament, match.p2) })}" />
     </div>`;
   });
 
   dialog.innerHTML = html`<form method="dialog" id="score-form">
     <header class="dialog__head">
-      <p class="dialog__stage">${match.stage === "group" ? matchStage(tournament, match) : match.label}</p>
+      <p class="dialog__stage">${model.matchLabel(tournament, match)}</p>
       <h2>
         <span>${model.playerName(tournament, match.p1)}</span>
-        <span class="muted">v</span>
+        <span class="muted">${t("v")}</span>
         <span>${model.playerName(tournament, match.p2)}</span>
       </h2>
-      <p class="muted">Best of ${maxSets} · first to ${tournament.settings.pointsPerSet}, win by two${raw(remaining ? ` · ${remaining} more to play` : "")}</p>
+      <p class="muted">
+        ${remaining
+          ? t("Best of {n} · first to {points}, win by two · {left} more to play", { n: maxSets, points: tournament.settings.pointsPerSet, left: remaining })
+          : t("Best of {n} · first to {points}, win by two", { n: maxSets, points: tournament.settings.pointsPerSet })}
+      </p>
     </header>
     <div class="dialog__body">
       <div class="setrows">${rows}</div>
-      <p class="dialog__hint">Type the loser's points and the winning score fills itself. Enter ${tournament.settings.pointsPerSet} or more and the other side is up to you.</p>
+      ${raw(
+        settings.get().autoFill
+          ? `<p class="dialog__hint">${esc(t("Type the loser's points and the winning score fills itself. Enter {points} or more and the other side is up to you.", { points: tournament.settings.pointsPerSet }))}</p>`
+          : ""
+      )}
       <p class="dialog__status" id="score-status"></p>
     </div>
     <footer class="dialog__foot">
       <div class="dialog__foot-left">
-        <button type="button" class="btn btn--ghost btn--small" data-dialog="walkover" data-winner="${match.p1}">w/o ${model.playerName(tournament, match.p1)}</button>
-        <button type="button" class="btn btn--ghost btn--small" data-dialog="walkover" data-winner="${match.p2}">w/o ${model.playerName(tournament, match.p2)}</button>
-        ${raw(match.winnerId ? '<button type="button" class="btn btn--ghost btn--small btn--danger" data-dialog="clear">Clear</button>' : "")}
-        <button type="button" class="btn btn--ghost btn--small" data-dialog="cancel">Close</button>
+        <button type="button" class="btn btn--ghost btn--small" data-dialog="walkover" data-winner="${match.p1}">${t("w/o {player}", { player: model.playerName(tournament, match.p1) })}</button>
+        <button type="button" class="btn btn--ghost btn--small" data-dialog="walkover" data-winner="${match.p2}">${t("w/o {player}", { player: model.playerName(tournament, match.p2) })}</button>
+        ${raw(match.winnerId ? `<button type="button" class="btn btn--ghost btn--small btn--danger" data-dialog="clear">${esc(t("Clear"))}</button>` : "")}
+        <button type="button" class="btn btn--ghost btn--small" data-dialog="cancel">${t("Close")}</button>
       </div>
       <div class="dialog__foot-right">
-        <button type="button" class="btn${raw(next ? "" : " btn--primary")}" data-dialog="save">Save</button>
+        <button type="button" class="btn${raw(next ? "" : " btn--primary")}" data-dialog="save">${t("Save")}</button>
         ${raw(
           next
-            ? `<button type="button" class="btn btn--primary" data-dialog="save-next" title="Save and open ${esc(sideName(tournament, next, 1))} v ${esc(sideName(tournament, next, 2))}">Save &amp; next ›</button>`
+            ? `<button type="button" class="btn btn--primary" data-dialog="save-next" title="${esc(t("Save and open {a} v {b}", { a: sideName(tournament, next, 1), b: sideName(tournament, next, 2) }))}">${esc(t("Save & next ›"))}</button>`
             : ""
         )}
       </div>
@@ -256,14 +262,16 @@ function handleScoreInput(input) {
 
   clearAuto(input);
 
-  const implied = impliedOpponent(value, pointsPerSet);
+  const implied = settings.get().autoFill ? impliedOpponent(value, pointsPerSet) : null;
   const otherIsOurs = other.dataset.auto === "true" || other.value.trim() === "";
-  if (otherIsOurs) setAuto(other, value === null ? null : implied);
+  if (otherIsOurs && (settings.get().autoFill || other.dataset.auto === "true")) {
+    setAuto(other, value === null ? null : implied);
+  }
 
   updateRowStates();
 
   const complete = inputValue(left) !== null && inputValue(right) !== null;
-  if (complete && value !== null && !mayGrow(value, pointsPerSet)) focusNext(row);
+  if (settings.get().autoAdvance && complete && value !== null && !mayGrow(value, pointsPerSet)) focusNext(row);
 }
 
 /** Focus the next score still worth typing, or the save button when done. */
@@ -328,7 +336,7 @@ function validateDialog() {
   const sets = readDialogSets();
   const filled = sets.filter(([a, b]) => a !== null && b !== null);
   if (!filled.length) {
-    status.textContent = "Enter the points for each set.";
+    status.textContent = t("Enter the points for each set.");
     status.className = "dialog__status";
     return null;
   }
@@ -341,7 +349,11 @@ function validateDialog() {
   const match = state.tournament.matches.find((m) => m.id === dialogMatchId);
   if (!match) return null;
   const winner = result.winnerSide === 0 ? match.p1 : match.p2;
-  status.textContent = `${model.playerName(state.tournament, winner)} wins ${Math.max(...result.setWins)}–${Math.min(...result.setWins)}`;
+  status.textContent = t("{player} wins {won}–{lost}", {
+    player: model.playerName(state.tournament, winner),
+    won: Math.max(...result.setWins),
+    lost: Math.min(...result.setWins),
+  });
   status.className = "dialog__status is-ok";
   return result;
 }
@@ -391,7 +403,7 @@ function wireDialog() {
       save();
       closeDialog();
       render();
-      toast("Result cleared");
+      toast(t("Result cleared"));
     }
     if (action === "walkover") {
       const result = model.recordWalkover(state.tournament, dialogMatchId, target.dataset.winner);
@@ -399,7 +411,7 @@ function wireDialog() {
       save();
       closeDialog();
       render();
-      toast("Walkover recorded");
+      toast(t("Walkover recorded"));
     }
   });
 
@@ -414,7 +426,7 @@ function wireDialog() {
 function saveDialog({ goNext = false } = {}) {
   const result = validateDialog();
   if (!result) {
-    toast("That score is not a complete, legal result yet.", "error");
+    toast(t("That score is not a complete, legal result yet."), "error");
     return;
   }
   const outcome = model.recordResult(state.tournament, dialogMatchId, readDialogSets());
@@ -424,7 +436,7 @@ function saveDialog({ goNext = false } = {}) {
   closeDialog();
   render();
   if (next) openScoreDialog(next.id);
-  else toast("Result saved");
+  else toast(t("Result saved"));
 }
 
 /** Enter on a filled-in match does whatever the primary button says. */
@@ -432,6 +444,114 @@ function primaryAction() {
   const dialog = $("#score-dialog");
   const button = dialog.querySelector('[data-dialog="save-next"]') || dialog.querySelector('[data-dialog="save"]');
   saveDialog({ goNext: !!(button && button.dataset.dialog === "save-next") });
+}
+
+/* ------------------------------------------------------------------ *
+ * Settings dialog
+ * ------------------------------------------------------------------ */
+
+function choiceRow(name, value, options) {
+  return options
+    .map(
+      (option) => `<label class="seg${option.id === value ? " is-active" : ""}">
+        <input type="radio" name="${name}" value="${option.id}" ${option.id === value ? "checked" : ""} />
+        <span>${esc(t(option.label))}</span>
+      </label>`
+    )
+    .join("");
+}
+
+function switchRow(key, label, checked, note = "") {
+  return `<label class="switch">
+    <input type="checkbox" data-setting="${key}" ${checked ? "checked" : ""} />
+    <span>
+      ${esc(t(label))}
+      ${note ? `<small>${esc(t(note))}</small>` : ""}
+    </span>
+  </label>`;
+}
+
+export function openSettingsDialog() {
+  const dialog = $("#settings-dialog");
+  const now = settings.get();
+
+  dialog.innerHTML = html`<form method="dialog">
+    <header class="dialog__head">
+      <h2>${t("Settings")}</h2>
+    </header>
+    <div class="dialog__body">
+      <section class="setting">
+        <h3>${t("Language")}</h3>
+        <div class="segmented" data-setting="language">
+          ${raw(choiceRow("language", now.language, LANGUAGES))}
+        </div>
+        ${raw(
+          now.language === "auto"
+            ? `<p class="hint">${esc(
+                t("Following the browser: {language}", {
+                  language: t(currentLanguage() === "sv" ? "Swedish" : "English"),
+                })
+              )}</p>`
+            : ""
+        )}
+      </section>
+
+      <section class="setting">
+        <h3>${t("View")}</h3>
+        <div class="segmented" data-setting="density">
+          ${raw(
+            choiceRow("density", now.density, [
+              { id: "compact", label: "Power user" },
+              { id: "comfortable", label: "Standard" },
+            ])
+          )}
+        </div>
+        <p class="hint">${t("Power user packs more on screen. Standard gives everything more room.")}</p>
+      </section>
+
+      <section class="setting">
+        <h3>${t("Score entry")}</h3>
+        ${raw(switchRow("autoFill", "Fill in the score the rules imply", now.autoFill))}
+        ${raw(switchRow("autoAdvance", "Jump to the next field when a set is settled", now.autoAdvance))}
+        ${raw(
+          switchRow(
+            "chainNext",
+            "Open the next unplayed match after saving",
+            now.chainNext,
+            "Matches are often reported out of order, so this is off by default."
+          )
+        )}
+      </section>
+    </div>
+    <footer class="dialog__foot">
+      <span class="muted">v${APP_VERSION}</span>
+      <button type="button" class="btn btn--primary" data-settings="close">${t("Done")}</button>
+    </footer>
+  </form>`;
+
+  if (!dialog.open) dialog.showModal();
+}
+
+function wireSettingsDialog() {
+  const dialog = $("#settings-dialog");
+
+  dialog.addEventListener("change", (event) => {
+    const target = event.target;
+    if (target.dataset.setting) {
+      settings.set({ [target.dataset.setting]: target.checked });
+    } else if (target.name === "language" || target.name === "density") {
+      settings.set({ [target.name]: target.value });
+    } else {
+      return;
+    }
+    openSettingsDialog(); // redraw in the new language and spacing
+    render();
+  });
+
+  on(dialog, "click", "[data-settings]", () => {
+    if (dialog.open) dialog.close();
+    render();
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -454,25 +574,30 @@ function wireGlobal() {
       download(`${slugify(state.tournament.name)}.json`, store.exportJSON(state.tournament));
       return;
     }
-    if (action === "next-match") {
-      const next = nextPlayable(null);
-      if (next) openScoreDialog(next.id);
-      else toast("Every match that can be played is done.");
+    if (action === "show-todo") {
+      state.filter = "todo";
+      state.groupFilter = "all";
+      state.search = "";
+      navigate(`#/t/${state.tournament.id}/matches`);
+      return;
+    }
+    if (action === "settings") {
+      openSettingsDialog();
       return;
     }
     if (action === "duplicate-current") {
       const copy = store.duplicate(state.tournament);
       navigate(`#/t/${copy.id}/setup`);
-      toast("Copy created");
+      toast(t("Copy created"));
       return;
     }
     if (action === "delete-current") {
       const name = state.tournament.name;
-      if (!confirm(`Delete “${name}” and all its scores? This cannot be undone.`)) return;
+      if (!confirm(t("Delete “{name}” and all its scores? This cannot be undone.", { name }))) return;
       store.remove(state.tournament.id);
       state.tournament = null;
       navigate("#/");
-      toast("Tournament deleted");
+      toast(t("Tournament deleted"));
       return;
     }
     if (state.view === "home") {
@@ -541,7 +666,7 @@ export async function promptInstall() {
   const choice = await installEvent.userChoice;
   installEvent = null;
   render();
-  if (choice && choice.outcome === "accepted") toast("Installed — look for TT Manager on your home screen");
+  if (choice && choice.outcome === "accepted") toast(t("Installed — look for TT Manager on your home screen"));
 }
 
 function watchInstall() {
@@ -584,8 +709,10 @@ function registerServiceWorker() {
   });
 }
 
+settings.load();
 wireGlobal();
 wireDialog();
+wireSettingsDialog();
 watchInstall();
 render();
 registerServiceWorker();

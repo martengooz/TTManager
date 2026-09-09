@@ -1,5 +1,6 @@
 /* Tournament domain model: creation, scheduling, scoring rules, standings, brackets. */
 import { uid } from "./util.js";
+import { t, ordinal as localOrdinal } from "./i18n.js";
 
 export const FORMATS = {
   roundrobin: { label: "Round robin", short: "Round robin", description: "Everyone plays everyone. Final placing from the table." },
@@ -47,6 +48,26 @@ export function addPlayer(tournament, name, club = "") {
 export function removePlayer(tournament, playerId) {
   tournament.players = tournament.players.filter((p) => p.id !== playerId);
   tournament.players.forEach((p, i) => { p.seed = i + 1; });
+}
+
+/** A group's display name, translated. Older saves only carry the English name. */
+export function groupName(group) {
+  if (!group) return "";
+  if (group.letter) return t("Group {letter}", { letter: group.letter });
+  if (group.letter === "") return t("Group");
+  return group.name || t("Group");
+}
+
+/** What a match is called: its group, its knockout round, or the bronze match. */
+export function matchLabel(tournament, match) {
+  if (!match) return "";
+  if (match.stage === "group") {
+    return groupName(tournament.groups.find((g) => g.id === match.groupId));
+  }
+  if (match.thirdPlace) return t("Third place");
+  const ko = tournament.matches.filter((m) => m.stage === "ko" && !m.thirdPlace);
+  const totalRounds = ko.length ? Math.max(...ko.map((m) => m.round)) + 1 : 1;
+  return roundName(match.round, totalRounds);
 }
 
 export function playerById(tournament, playerId) {
@@ -102,25 +123,38 @@ export function validateResult(sets, settings) {
   const bestOf = settings.bestOf;
   const target = setsToWin(bestOf);
   const clean = sets.filter(([a, b]) => a !== null && b !== null && !(a === 0 && b === 0));
-  if (!clean.length) return { ok: false, error: "Enter at least one set." };
+  if (!clean.length) return { ok: false, error: t("Enter at least one set.") };
 
   let wins = [0, 0];
   for (let i = 0; i < clean.length; i += 1) {
     const [a, b] = clean[i];
     if (wins[0] >= target || wins[1] >= target) {
-      return { ok: false, error: `The match was already decided after set ${i}. Remove the extra sets.` };
+      return { ok: false, error: t("The match was already decided after set {n}. Remove the extra sets.", { n: i }) };
     }
     if (!isValidSet(a, b, settings.pointsPerSet)) {
       return {
         ok: false,
-        error: `Set ${i + 1} (${a}-${b}) is not a legal score: first to ${settings.pointsPerSet}, win by two.`,
+        error: t("Set {n} ({a}-{b}) is not a legal score: first to {points}, win by two.", {
+          n: i + 1,
+          a,
+          b,
+          points: settings.pointsPerSet,
+        }),
       };
     }
     if (a > b) wins[0] += 1;
     else wins[1] += 1;
   }
   if (wins[0] < target && wins[1] < target) {
-    return { ok: false, error: `Best of ${bestOf}: someone needs ${target} sets to win (currently ${wins[0]}-${wins[1]}).` };
+    return {
+      ok: false,
+      error: t("Best of {n}: someone needs {target} sets to win (currently {a}-{b}).", {
+        n: bestOf,
+        target,
+        a: wins[0],
+        b: wins[1],
+      }),
+    };
   }
   return { ok: true, winnerSide: wins[0] > wins[1] ? 0 : 1, setWins: wins, sets: clean };
 }
@@ -169,7 +203,7 @@ export function setsLine(match) {
 
 export function recordResult(tournament, matchId, sets) {
   const match = tournament.matches.find((m) => m.id === matchId);
-  if (!match) return { ok: false, error: "Match not found." };
+  if (!match) return { ok: false, error: t("Match not found.") };
   const result = validateResult(sets, tournament.settings);
   if (!result.ok) return result;
   match.sets = result.sets.map(([a, b]) => [a, b]);
@@ -184,8 +218,8 @@ export function recordResult(tournament, matchId, sets) {
 
 export function recordWalkover(tournament, matchId, winnerId) {
   const match = tournament.matches.find((m) => m.id === matchId);
-  if (!match) return { ok: false, error: "Match not found." };
-  if (winnerId !== match.p1 && winnerId !== match.p2) return { ok: false, error: "Pick the player who advances." };
+  if (!match) return { ok: false, error: t("Match not found.") };
+  if (winnerId !== match.p1 && winnerId !== match.p2) return { ok: false, error: t("Pick the player who advances.") };
   match.sets = [];
   match.status = "walkover";
   match.walkoverWinnerId = winnerId;
@@ -270,9 +304,12 @@ export function drawTournament(tournament, { random = true } = {}) {
   const groupCount = tournament.format === "roundrobin" ? 1 : Math.max(1, Math.min(tournament.settings.groupCount, Math.floor(ids.length / 2) || 1));
   const buckets = distribute(ids, groupCount);
   buckets.forEach((playerIds, index) => {
+    const letter = groupCount === 1 ? "" : GROUP_NAMES[index] || String(index + 1);
     tournament.groups.push({
       id: uid("g"),
-      name: groupCount === 1 ? "Group" : `Group ${GROUP_NAMES[index] || index + 1}`,
+      letter,
+      // Kept for tournaments saved before names were translated.
+      name: letter ? `Group ${letter}` : "Group",
       playerIds,
     });
   });
@@ -291,7 +328,7 @@ export function drawTournament(tournament, { random = true } = {}) {
               order: order++,
               p1: leg === 0 ? a : b,
               p2: leg === 0 ? b : a,
-              label: `${group.name} · round ${roundIndex + 1}`,
+              label: "",
             })
           );
         });
@@ -337,10 +374,13 @@ export function seedOrder(size) {
 
 export function roundName(roundIndex, totalRounds) {
   const fromEnd = totalRounds - roundIndex;
-  if (fromEnd === 1) return "Final";
-  if (fromEnd === 2) return "Semi-finals";
-  if (fromEnd === 3) return "Quarter-finals";
-  return `Round of ${2 ** fromEnd}`;
+  if (fromEnd === 1) return t("Final");
+  if (fromEnd === 2) return t("Semi-finals");
+  if (fromEnd === 3) return t("Quarter-finals");
+  const size = 2 ** fromEnd;
+  if (size === 16) return t("Round of 16");
+  if (size === 32) return t("Round of 32");
+  return t("Round of {n}", { n: size });
 }
 
 function buildKnockout(tournament, entrants) {
@@ -423,22 +463,19 @@ function resolveSource(tournament, source, standingsByGroup) {
 }
 
 export function sourceLabel(tournament, source) {
-  if (!source) return "Bye";
-  if (source.type === "player") return playerName(tournament, source.playerId) || "TBD";
+  if (!source) return t("Bye");
+  if (source.type === "player") return playerName(tournament, source.playerId) || t("TBD");
   if (source.type === "groupRank") {
     const group = tournament.groups.find((g) => g.id === source.groupId);
-    return group ? `${ordinal(source.rank)} ${group.name}` : "TBD";
+    return group ? t("{rank} {group}", { rank: ordinal(source.rank), group: groupName(group) }) : t("TBD");
   }
   const match = tournament.matches.find((m) => m.id === source.matchId);
-  if (!match) return "TBD";
-  const verb = source.type === "winner" ? "Winner" : "Loser";
-  return `${verb} ${match.label} ${match.order + 1}`;
+  if (!match) return t("TBD");
+  const key = source.type === "winner" ? "Winner {round} {n}" : "Loser {round} {n}";
+  return t(key, { round: matchLabel(tournament, match), n: match.order + 1 });
 }
 
-export function ordinal(n) {
-  const suffix = ["th", "st", "nd", "rd"][(n % 100 - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th";
-  return `${n}${suffix}`;
-}
+export const ordinal = localOrdinal;
 
 /** Recomputes knockout participants after any result changes. */
 export function refresh(tournament) {

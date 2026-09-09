@@ -27,6 +27,8 @@ shows in the start screen footer, so you can check what a phone is actually runn
 | --- | --- |
 | `index.html`, `styles.css` | app shell, and everything visual including the print sheet |
 | `version.js` | the version, loaded by the page and by `sw.js` |
+| `js/i18n.js` | translations, keyed by the English string |
+| `js/settings.js` | language, view density, score entry preferences |
 | `js/model.js` | draw, schedules, scoring rules, standings, bracket — no DOM dependencies |
 | `js/store.js` | local storage, export and import |
 | `js/components.js` | shared rendering: match cards, tables, bracket, podium |
@@ -41,6 +43,18 @@ the next one. That governs the interface: the topbar is one row plus tabs, scree
 enough to show a useful number of matches at once, whole match cards are tap targets rather
 than buttons inside them, and the score dialog chains into the next match. Anything added here
 should cost a tap, not a trip back to a list.
+
+## Translations
+
+`js/i18n.js` keys every string by its English text, so `t("Enter score")` reads as itself and an
+untranslated key still renders correctly. Placeholders are `{named}`. Adding a language means
+adding a dictionary and an entry in `LANGUAGES`; adding a string means calling `t()` and putting
+the Swedish in `SV`.
+
+Two traps. Views take the tournament as a parameter, so never name that parameter `t` — it
+shadows the translator. And never store translated text in tournament data: groups keep a
+`letter` and knockout rounds their round index, and `groupName()` / `matchLabel()` turn those
+into words at render time, so switching language re-labels saved tournaments too.
 
 ## Worth knowing
 
