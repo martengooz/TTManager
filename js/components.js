@@ -1,8 +1,11 @@
 /* Reusable render helpers shared by the screens and the printable sheet. */
 import { html, raw, esc } from "./util.js";
+import { t } from "./i18n.js";
 import {
   standings,
   playerName,
+  groupName,
+  matchLabel,
   setWinsFromSets,
   setsLine,
   knockoutRounds,
@@ -24,49 +27,41 @@ export function sideName(tournament, match, side) {
 }
 
 export function matchTitle(tournament, match) {
-  if (match.stage === "group") {
-    const group = tournament.groups.find((g) => g.id === match.groupId);
-    return group ? group.name : "Group";
-  }
-  return match.label;
+  return matchLabel(tournament, match);
 }
 
-/** One match card. `interactive` adds the scoring buttons. */
-export function matchCard(tournament, match, { interactive = true, number = null } = {}) {
+/** One match card. The whole card is the tap target - no separate button. */
+export function matchCard(tournament, match, { interactive = true, number = null, showStage = true } = {}) {
   const [setsA, setsB] = setWinsFromSets(match.sets);
   const played = match.status === "played";
   const decided = !!match.winnerId;
-  const scoreA = played ? setsA : match.status === "walkover" && match.winnerId === match.p1 ? "w/o" : "";
-  const scoreB = played ? setsB : match.status === "walkover" && match.winnerId === match.p2 ? "w/o" : "";
+  const walkover = match.status === "walkover";
+  const score = (playerId, sets) => (played ? sets : walkover && match.winnerId === playerId ? "w/o" : "");
   const winnerClass = (playerId) => (decided && match.winnerId === playerId ? " is-winner" : decided ? " is-loser" : "");
 
-  const actions = interactive
-    ? html`<div class="match__actions">
-        <button class="btn btn--small" data-action="score" data-match="${match.id}" ${raw(match.p1 && match.p2 ? "" : "disabled")}>
-          ${decided ? "Edit score" : "Enter score"}
-        </button>
-      </div>`
-    : "";
-
-  return html`<article class="match${raw(decided ? " match--done" : "")}${raw(match.status === "bye" ? " match--bye" : "")}" data-match="${match.id}">
+  return html`<article
+    class="match${raw(decided ? " match--done" : "")}${raw(match.status === "bye" ? " match--bye" : "")}"
+    data-match="${match.id}"
+    ${raw(interactive ? 'role="button" tabindex="0"' : "")}
+  >
     <header class="match__meta">
       <span class="match__no">${number != null ? `#${number}` : ""}</span>
-      <span>${matchTitle(tournament, match)}</span>
-      ${raw(match.status === "bye" ? '<span class="tag">bye</span>' : "")}
-      ${raw(match.status === "walkover" ? '<span class="tag">walkover</span>' : "")}
+      ${raw(showStage ? `<span class="match__stage">${esc(matchTitle(tournament, match))}</span>` : "")}
+      ${raw(match.status === "bye" ? `<span class="tag">${esc(t("bye"))}</span>` : "")}
+      ${raw(walkover ? `<span class="tag">${esc(t("w/o"))}</span>` : "")}
+      ${raw(interactive ? `<span class="match__cta">${esc(decided ? t("Edit") : t("Enter score"))}</span>` : "")}
     </header>
     <div class="match__players">
       <div class="side${raw(winnerClass(match.p1))}">
         <span class="side__name">${sideName(tournament, match, 1)}</span>
-        <span class="side__score">${scoreA}</span>
+        <span class="side__score">${score(match.p1, setsA)}</span>
       </div>
       <div class="side${raw(winnerClass(match.p2))}">
         <span class="side__name">${sideName(tournament, match, 2)}</span>
-        <span class="side__score">${scoreB}</span>
+        <span class="side__score">${score(match.p2, setsB)}</span>
       </div>
     </div>
-    <div class="match__sets">${setsLine(match) || (interactive ? "" : " ")}</div>
-    ${raw(actions)}
+    ${raw(match.sets.length ? `<div class="match__sets">${esc(setsLine(match))}</div>` : "")}
   </article>`;
 }
 
@@ -74,21 +69,21 @@ export function standingsTable(tournament, group, { qualifiers = 0, heading = nu
   const rows = standings(tournament, group.id);
   const complete = groupComplete(tournament, group.id);
   return html`<h3 class="table-title">
-      ${heading || group.name}
-      ${raw(complete ? '<span class="tag tag--ok">complete</span>' : "")}
+      ${heading ? t(heading) : groupName(group)}
+      ${raw(complete ? `<span class="tag tag--ok">${esc(t("complete"))}</span>` : "")}
     </h3>
     <div class="table-wrap">
     <table class="table table--standings">
       <thead>
         <tr>
           <th class="num">#</th>
-          <th>Player</th>
-          <th class="num" title="Matches played">P</th>
-          <th class="num" title="Wins">W</th>
-          <th class="num" title="Losses">L</th>
-          <th class="num" title="Sets won-lost">Sets</th>
-          <th class="num" title="Points won-lost">Points</th>
-          <th class="num" title="Table points: 2 for a win, 1 for a loss">Pts</th>
+          <th>${t("Player")}</th>
+          <th class="num" title="${t("Matches played")}">${t("P")}</th>
+          <th class="num" title="${t("Wins")}">${t("W")}</th>
+          <th class="num" title="${t("Losses")}">${t("L")}</th>
+          <th class="num" title="${t("Sets won-lost")}">${t("Sets")}</th>
+          <th class="num" title="${t("Points won-lost")}">${t("Points")}</th>
+          <th class="num" title="${t("Table points: 2 for a win, 1 for a loss")}">${t("Pts")}</th>
         </tr>
       </thead>
       <tbody>
@@ -100,7 +95,7 @@ export function standingsTable(tournament, group, { qualifiers = 0, heading = nu
             <td>
               <span class="player-name">${player ? player.name : "—"}</span>
               ${raw(player && player.club ? `<span class="player-club">${esc(player.club)}</span>` : "")}
-              ${raw(qualifies ? '<span class="tag tag--q">Q</span>' : "")}
+              ${raw(qualifies ? `<span class="tag tag--q">${esc(t("Q"))}</span>` : "")}
             </td>
             <td class="num">${row.played}</td>
             <td class="num">${row.wins}</td>
@@ -110,7 +105,7 @@ export function standingsTable(tournament, group, { qualifiers = 0, heading = nu
             <td class="num strong">${row.points}</td>
           </tr>`;
         })}
-        ${raw(rows.length ? "" : '<tr><td colspan="8" class="muted">No players in this group yet.</td></tr>')}
+        ${raw(rows.length ? "" : `<tr><td colspan="8" class="muted">${esc(t("No players in this group yet."))}</td></tr>`)}
       </tbody>
     </table>
   </div>`;
@@ -126,18 +121,18 @@ export function crossTable(tournament, group, { heading = null } = {}) {
       (m) => (m.p1 === rowId && m.p2 === colId) || (m.p1 === colId && m.p2 === rowId)
     );
     if (!match || !match.winnerId) return '<td class="num muted">·</td>';
-    if (match.status === "walkover") return `<td class="num">${match.winnerId === rowId ? "w/o" : "–"}</td>`;
+    if (match.status === "walkover") return `<td class="num">${match.winnerId === rowId ? esc(t("w/o")) : "–"}</td>`;
     const [a, b] = setWinsFromSets(match.sets);
     const own = match.p1 === rowId ? a : b;
     const other = match.p1 === rowId ? b : a;
     return `<td class="num ${own > other ? "cross-win" : "cross-loss"}">${own}–${other}</td>`;
   };
-  return html`<h3 class="table-title">${heading || `${group.name} — results grid`}</h3>
+  return html`<h3 class="table-title">${heading ? t(heading) : t("{group} — results grid", { group: groupName(group) })}</h3>
     <div class="table-wrap">
     <table class="table table--cross">
       <thead>
         <tr>
-          <th>Player</th>
+          <th>${t("Player")}</th>
           ${ids.map((id, i) => `<th class="num">${i + 1}</th>`)}
         </tr>
       </thead>
@@ -187,7 +182,7 @@ export function bracketHTML(tournament, { interactive = true } = {}) {
     ${raw(
       third
         ? html`<div class="bracket__round bracket__round--third">
-            <h4 class="bracket__title">Third place</h4>
+            <h4 class="bracket__title">${t("Third place")}</h4>
             <div class="bracket__matches">${raw(node(third))}</div>
           </div>`
         : ""
@@ -214,22 +209,23 @@ export function scheduleTable(tournament, matches) {
       <thead>
         <tr>
           <th class="num">#</th>
-          <th>Stage</th>
-          <th>Match</th>
-          <th class="num">Sets</th>
-          <th>Set scores</th>
+          <th>${t("Stage")}</th>
+          <th>${t("Match")}</th>
+          <th class="num">${t("Sets")}</th>
+          <th>${t("Set scores")}</th>
         </tr>
       </thead>
       <tbody>
         ${matches.map((match, index) => {
           const [a, b] = setWinsFromSets(match.sets);
-          const result = match.status === "played" ? `${a}–${b}` : match.status === "walkover" ? "w/o" : match.status === "bye" ? "bye" : "—";
+          const result =
+            match.status === "played" ? `${a}–${b}` : match.status === "walkover" ? t("w/o") : match.status === "bye" ? t("bye") : "—";
           return html`<tr>
             <td class="num">${index + 1}</td>
             <td>${matchTitle(tournament, match)}</td>
             <td>
               <span class="${raw(match.winnerId === match.p1 ? "strong" : "")}">${sideName(tournament, match, 1)}</span>
-              <span class="muted"> v </span>
+              <span class="muted"> ${t("v")} </span>
               <span class="${raw(match.winnerId === match.p2 ? "strong" : "")}">${sideName(tournament, match, 2)}</span>
             </td>
             <td class="num">${result}</td>

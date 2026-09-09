@@ -12,7 +12,10 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
 **Set up a tournament**
 - Three formats: round robin, groups + knockout, or a straight knockout bracket.
 - Match length from best of 1 to best of 9, at 11 or 21 points a set.
-- Players added one at a time or pasted in as a list (`Name, Club` per line).
+- Players go into one field: type a name, add a club after a comma, or paste a whole list and
+  add it in one go. Names can be corrected in place afterwards without disturbing the draw.
+- A new tournament starts from the last one's format and rules, since a club runs the same
+  shape of event week after week.
 - The draw distributes players across groups snake-style, builds every group schedule with
   the circle method, and seeds the bracket so players from the same group meet as late as
   possible. Byes are handled automatically.
@@ -27,6 +30,8 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
   type the other side. Sets after the one that decided the match grey out, and once the result
   is complete the focus lands on *Save result*, so a four set match is a handful of keystrokes.
 - Walkovers, editing and clearing a result are all one click.
+- Tap anywhere on a match card to open it. The count in the header is a button too — it shows
+  what is still to play.
 - Group tables update immediately, and knockout places fill in as soon as a group finishes
   or a match is decided.
 
@@ -41,6 +46,15 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
   every group table, results grid and match score, the knockout results, the bracket and the
   podium. Tick the sections you want, then print or save as PDF.
 - `Ctrl/Cmd + P` from any screen jumps to that sheet and opens the print dialog.
+
+**Fit it to how you work**
+- **Language** — English and Swedish, following the browser unless you pick one in *Settings*.
+- **View** — *Power user* packs as much on screen as it can; *Standard* gives everything more room.
+- **Score entry** — the implied score and the jump to the next field can each be turned off, and
+  opening the next unplayed match after saving can be turned on. That last one is off by default,
+  because results come back from the tables in whatever order the matches finish.
+- **Finding a match** — the matches screen has a search box: a few letters of a player's name, or a
+  match number, narrows the list to the result you have in your hand.
 
 **Work anywhere**
 - Everything is saved in the browser's local storage as you go, so closing the tab loses nothing.
@@ -85,6 +99,8 @@ styles.css              everything visual, including the print sheet
 manifest.webmanifest    PWA metadata
 version.js              the app version, read by the page and by the service worker
 sw.js                   offline cache, named after the version
+js/i18n.js              translations; keys are the English strings themselves
+js/settings.js          language, view density and score entry preferences
 js/model.js             draw, schedule, scoring rules, standings, bracket
 js/store.js             local storage, export and import
 js/components.js        shared rendering: match cards, tables, bracket, podium
