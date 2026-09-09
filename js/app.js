@@ -1,7 +1,7 @@
 /* Router, shared state and the score entry dialog. */
 import * as store from "./store.js";
 import * as model from "./model.js";
-import { $, html, raw, esc, on, download, slugify, formatDate } from "./util.js";
+import { $, html, raw, esc, on, download, slugify, formatDate, APP_VERSION } from "./util.js";
 import * as home from "./views/home.js";
 import * as setup from "./views/setup.js";
 import * as matches from "./views/matches.js";
@@ -74,16 +74,23 @@ function chrome(tournament, view) {
     </header>`;
 }
 
-/** Re-renders the current screen without jumping back to the top. */
+/** Re-renders the current screen. Scroll handling lives in render itself. */
 export function rerenderView() {
-  const y = window.scrollY;
   render();
-  window.scrollTo({ top: y });
 }
+
+/* Moving to another screen starts at the top; redrawing the screen you are
+   already on keeps you where you were, so adding a player or saving a score
+   does not throw you back up the page. */
+let lastScreen = null;
 
 export function render() {
   const route = parseHash();
   const app = $("#app");
+  const scrollY = window.scrollY;
+  const screen = `${route.id || "home"}/${route.id ? route.view : ""}`;
+  const sameScreen = screen === lastScreen;
+  lastScreen = screen;
 
   if (!route.id) {
     state.tournament = null;
@@ -92,6 +99,7 @@ export function render() {
     document.body.dataset.view = "home";
     document.title = "TT Manager";
     if (home.afterRender) home.afterRender();
+    restoreScroll(sameScreen, scrollY);
     return;
   }
 
@@ -110,7 +118,11 @@ export function render() {
   document.body.dataset.view = state.view;
   document.title = `${tournament.name} · TT Manager`;
   if (view.afterRender) view.afterRender(tournament);
-  window.scrollTo({ top: 0 });
+  restoreScroll(sameScreen, scrollY);
+}
+
+function restoreScroll(sameScreen, scrollY) {
+  window.scrollTo({ top: sameScreen ? scrollY : 0, behavior: "auto" });
 }
 
 /* ------------------------------------------------------------------ *
@@ -149,6 +161,7 @@ export function openScoreDialog(matchId) {
     </header>
     <div class="dialog__body">
       <div class="setrows">${rows}</div>
+      <p class="dialog__hint">Type the loser's points and the winning score fills itself. Enter ${tournament.settings.pointsPerSet} or more and the other side is up to you.</p>
       <p class="dialog__status" id="score-status"></p>
     </div>
     <footer class="dialog__foot">
@@ -165,14 +178,124 @@ export function openScoreDialog(matchId) {
   </form>`;
 
   dialog.showModal();
-  const first = dialog.querySelector(".score-input");
-  if (first) first.focus();
+  updateRowStates();
+  const first = dialog.querySelector(".score-input:not([disabled])");
+  if (first) {
+    first.focus({ preventScroll: true });
+    first.select();
+  }
   validateDialog();
 }
 
 function matchStage(tournament, match) {
   const group = tournament.groups.find((g) => g.id === match.groupId);
   return group ? group.name : "Match";
+}
+
+/**
+ * The only score its opponent follows from is a losing one: anything up to two
+ * short of the target lost to the target itself, and one short lost the deuce
+ * by two. From the target upwards a score can be either the winning or the
+ * losing side (12 could be 12-10 or 14-12), so the organiser types that one.
+ */
+function impliedOpponent(value, pointsPerSet) {
+  if (!Number.isInteger(value) || value < 0) return null;
+  if (value <= pointsPerSet - 2) return pointsPerSet;
+  if (value === pointsPerSet - 1) return pointsPerSet + 1;
+  return null;
+}
+
+/** "1" may still be on its way to 10-19, so do not jump off it yet. */
+function mayGrow(value, pointsPerSet) {
+  return value >= 1 && value * 10 <= pointsPerSet + 9;
+}
+
+function rowInputs(row) {
+  return Array.from(row.querySelectorAll(".score-input"));
+}
+
+function inputValue(input) {
+  const raw = input.value.trim();
+  if (raw === "") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function setAuto(input, value) {
+  input.value = value === null ? "" : String(value);
+  input.dataset.auto = value === null ? "" : "true";
+  input.classList.toggle("is-auto", value !== null);
+}
+
+function clearAuto(input) {
+  input.dataset.auto = "";
+  input.classList.remove("is-auto");
+}
+
+/** Fills in whatever the typed score forces, and moves on when it is settled. */
+function handleScoreInput(input) {
+  const { pointsPerSet } = state.tournament.settings;
+  const row = input.closest(".setrow");
+  const [left, right] = rowInputs(row);
+  const other = input === left ? right : left;
+  const value = inputValue(input);
+
+  clearAuto(input);
+
+  const implied = impliedOpponent(value, pointsPerSet);
+  const otherIsOurs = other.dataset.auto === "true" || other.value.trim() === "";
+  if (otherIsOurs) setAuto(other, value === null ? null : implied);
+
+  updateRowStates();
+
+  const complete = inputValue(left) !== null && inputValue(right) !== null;
+  if (complete && value !== null && !mayGrow(value, pointsPerSet)) focusNext(row);
+}
+
+/** Focus the next score still worth typing, or the save button when done. */
+function focusNext(fromRow) {
+  const rows = Array.from($("#score-dialog").querySelectorAll(".setrow"));
+  for (let i = rows.indexOf(fromRow) + 1; i < rows.length; i += 1) {
+    const next = rowInputs(rows[i]).find((input) => !input.disabled && input.value.trim() === "");
+    if (next) {
+      next.focus({ preventScroll: true });
+      next.select();
+      return;
+    }
+  }
+  const save = $("#score-dialog").querySelector('[data-dialog="save"]');
+  if (save) save.focus({ preventScroll: true });
+}
+
+/**
+ * Sets after the one that decided the match are not played, so they are dimmed
+ * and locked - unless they already hold a score, which must stay fixable.
+ */
+function updateRowStates() {
+  const settings = state.tournament.settings;
+  const target = model.setsToWin(settings.bestOf);
+  const rows = Array.from($("#score-dialog").querySelectorAll(".setrow"));
+  const wins = [0, 0];
+  let decidedAt = -1;
+
+  rows.forEach((row, index) => {
+    if (decidedAt !== -1) return;
+    const [a, b] = rowInputs(row).map(inputValue);
+    if (a === null || b === null || a === b) return;
+    if (a > b) wins[0] += 1;
+    else wins[1] += 1;
+    if (wins[0] >= target || wins[1] >= target) decidedAt = index;
+  });
+
+  rows.forEach((row, index) => {
+    const inputs = rowInputs(row);
+    const empty = inputs.every((input) => input.value.trim() === "");
+    const spent = decidedAt !== -1 && index > decidedAt;
+    row.classList.toggle("is-inactive", spent && empty);
+    inputs.forEach((input) => {
+      input.disabled = spent && empty;
+    });
+  });
 }
 
 function readDialogSets() {
@@ -217,16 +340,28 @@ function wireDialog() {
   const dialog = $("#score-dialog");
 
   dialog.addEventListener("input", (event) => {
-    if (event.target.classList.contains("score-input")) validateDialog();
+    if (!event.target.classList.contains("score-input")) return;
+    handleScoreInput(event.target);
+    validateDialog();
   });
 
   dialog.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    const inputs = Array.from(dialog.querySelectorAll(".score-input"));
-    const index = inputs.indexOf(document.activeElement);
-    if (index >= 0 && index < inputs.length - 1) inputs[index + 1].focus();
-    else saveDialog();
+    const active = document.activeElement;
+    if (!active || !active.classList.contains("score-input")) {
+      saveDialog();
+      return;
+    }
+    const row = active.closest(".setrow");
+    const [left, right] = rowInputs(row);
+    const other = active === left ? right : left;
+    if (inputValue(other) === null && !other.disabled) {
+      other.focus({ preventScroll: true });
+      other.select();
+      return;
+    }
+    focusNext(row);
   });
 
   on(dialog, "click", "[data-dialog]", (event, target) => {
@@ -357,8 +492,27 @@ function watchInstall() {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+
+  // A worker taking over a page that already had one means a new version is in
+  // charge, and the running code is now older than the files being served.
+  // Reload once so a bumped version lands without closing the app - but never
+  // in the middle of typing a score.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    const dialog = $("#score-dialog");
+    if (!hadController || reloading || (dialog && dialog.open)) return;
+    reloading = true;
+    location.reload();
+  });
+
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register(new URL("../sw.js", import.meta.url), { scope: "./" }).catch((error) => {
+    // The version in the URL makes a new release a different script to the
+    // browser, so the update is picked up even where imported scripts are not
+    // part of the update check.
+    const url = new URL("../sw.js", import.meta.url);
+    url.searchParams.set("v", APP_VERSION);
+    navigator.serviceWorker.register(url, { scope: "./" }).catch((error) => {
       console.warn("Service worker registration failed", error);
     });
   });

@@ -1,7 +1,7 @@
 /* Start screen: the list of saved tournaments plus creating and importing. */
 import * as store from "../store.js";
 import * as model from "../model.js";
-import { html, raw, esc, formatDate, download, slugify } from "../util.js";
+import { html, raw, esc, formatDate, download, slugify, APP_VERSION } from "../util.js";
 import { navigate, toast, render as rerender, installAvailable, promptInstall } from "../app.js";
 
 export function render() {
@@ -79,6 +79,7 @@ export function render() {
     <footer class="home__foot muted">
       Scores follow the standard rules: sets to 11, win by two, best of 3/5/7. Install the app from your
       browser menu to use it courtside without a connection.
+      <span class="home__version">v${APP_VERSION}</span>
     </footer>
   </div>`;
 }

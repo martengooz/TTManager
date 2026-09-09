@@ -1,11 +1,15 @@
-/* Offline shell for TT Manager. Bump CACHE when the app files change. */
-const CACHE = "ttmanager-v1";
+/* Offline shell for TT Manager. The cache is named after the app version, so
+   bumping version.js is what retires the previous cache. */
+importScripts("./version.js");
+
+const CACHE = `ttmanager-${self.APP_VERSION}`;
 
 const ASSETS = [
   "./",
   "index.html",
   "styles.css",
   "manifest.webmanifest",
+  "version.js",
   "icons/icon.svg",
   "icons/icon-192.png",
   "icons/icon-512.png",

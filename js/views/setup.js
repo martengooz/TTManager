@@ -207,7 +207,7 @@ export function submit(form, element) {
     save();
     rerender();
     const input = document.querySelector('.player-form input[name="name"]');
-    if (input) input.focus();
+    if (input) input.focus({ preventScroll: true });
   }
   if (form === "bulk-players") {
     const lines = String(data.get("bulk") || "")

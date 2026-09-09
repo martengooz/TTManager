@@ -1,0 +1,48 @@
+# TT Manager
+
+A static, offline-first PWA for running table tennis tournaments. Plain HTML, CSS and ES
+modules served as they are — no build step, no dependencies, no back end. Open it over HTTP
+(`npx http-server . -p 8080`), not `file://`, or the modules and service worker will not load.
+
+## Bump the version on every change
+
+`version.js` holds `self.APP_VERSION`, and it is the one thing that must change in every
+commit that touches a file the service worker caches — which is every app file.
+
+```js
+self.APP_VERSION = "1.1.0";
+```
+
+The service worker names its cache after it (`ttmanager-${APP_VERSION}`), so a new number is
+what makes installed copies fetch the new files; leave it alone and phones keep serving the
+old app from cache, and the change looks like it never shipped. The version is also part of
+the service worker's registration URL, so the browser sees a new release as a new script.
+
+Patch bump for a fix, minor for a feature, and say the new number in the commit message. It
+shows in the start screen footer, so you can check what a phone is actually running.
+
+## Layout
+
+| Path | Holds |
+| --- | --- |
+| `index.html`, `styles.css` | app shell, and everything visual including the print sheet |
+| `version.js` | the version, loaded by the page and by `sw.js` |
+| `js/model.js` | draw, schedules, scoring rules, standings, bracket — no DOM dependencies |
+| `js/store.js` | local storage, export and import |
+| `js/components.js` | shared rendering: match cards, tables, bracket, podium |
+| `js/app.js` | router, shared state, score dialog |
+| `js/views/` | one module per screen |
+| `sw.js` | offline cache |
+
+## Worth knowing
+
+- `js/model.js` never touches the DOM, so tournament logic can be exercised straight from
+  Node — useful for checking a tie-break, a bye or a bracket seeding by hand.
+- Screens re-render wholesale. `render()` keeps the scroll offset when redrawing the screen
+  you are already on and only jumps to the top when the route changes, so in-place updates
+  must go through it rather than patching the DOM.
+- Scoring rules live in `isValidSet` and `validateResult`. A set ends at the target with a
+  two point margin, or by exactly two after deuce; the score dialog fills in whatever those
+  rules already determine.
+- `.github/workflows/pages.yml` deploys the repository root to GitHub Pages on every push to
+  `main`. Pages must be set to the *GitHub Actions* source in the repository settings.
