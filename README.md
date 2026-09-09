@@ -12,7 +12,10 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
 **Set up a tournament**
 - Three formats: round robin, groups + knockout, or a straight knockout bracket.
 - Match length from best of 1 to best of 9, at 11 or 21 points a set.
-- Players added one at a time or pasted in as a list (`Name, Club` per line).
+- Players go into one field: type a name, add a club after a comma, or paste a whole list and
+  add it in one go. Names can be corrected in place afterwards without disturbing the draw.
+- A new tournament starts from the last one's format and rules, since a club runs the same
+  shape of event week after week.
 - The draw distributes players across groups snake-style, builds every group schedule with
   the circle method, and seeds the bracket so players from the same group meet as late as
   possible. Byes are handled automatically.
@@ -27,6 +30,10 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
   type the other side. Sets after the one that decided the match grey out, and once the result
   is complete the focus lands on *Save result*, so a four set match is a handful of keystrokes.
 - Walkovers, editing and clearing a result are all one click.
+- Built for entering a whole round in one sitting: tap anywhere on a match card to open it,
+  and *Save & next* stores the result and opens the following match without going back to the
+  list. The count in the header is a button too — it opens the next match to be played from
+  wherever you are.
 - Group tables update immediately, and knockout places fill in as soon as a group finishes
   or a match is decided.
 

@@ -34,6 +34,14 @@ shows in the start screen footer, so you can check what a phone is actually runn
 | `js/views/` | one module per screen |
 | `sw.js` | offline cache |
 
+## Built for one-handed use at the table
+
+The organiser is standing in a hall with a phone, entering a finished match between points of
+the next one. That governs the interface: the topbar is one row plus tabs, screens stay dense
+enough to show a useful number of matches at once, whole match cards are tap targets rather
+than buttons inside them, and the score dialog chains into the next match. Anything added here
+should cost a tap, not a trip back to a list.
+
 ## Worth knowing
 
 - `js/model.js` never touches the DOM, so tournament logic can be exercised straight from

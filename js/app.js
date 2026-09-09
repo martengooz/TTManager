@@ -1,13 +1,14 @@
 /* Router, shared state and the score entry dialog. */
 import * as store from "./store.js";
 import * as model from "./model.js";
-import { $, html, raw, esc, on, download, slugify, formatDate, APP_VERSION } from "./util.js";
+import { $, $$, html, raw, esc, on, download, slugify, formatDate, APP_VERSION } from "./util.js";
 import * as home from "./views/home.js";
 import * as setup from "./views/setup.js";
 import * as matches from "./views/matches.js";
 import * as standings from "./views/standings.js";
 import * as bracket from "./views/bracket.js";
 import * as printView from "./views/print.js";
+import { sideName } from "./components.js";
 
 const VIEWS = { setup, matches, standings, bracket, print: printView };
 const TABS = [
@@ -49,28 +50,29 @@ function chrome(tournament, view) {
   const tabs = TABS.filter((tab) => tab.id !== "bracket" || showBracket);
   return html`<header class="topbar">
       <div class="topbar__row">
-        <a class="btn btn--ghost" href="#/" title="All tournaments">← All</a>
-        <div class="topbar__title">
-          <h1>${tournament.name}</h1>
-          <p class="muted">
-            ${model.FORMATS[tournament.format].label} · best of ${tournament.settings.bestOf} ·
-            ${tournament.players.length} players${raw(tournament.date ? ` · ${esc(formatDate(tournament.date))}` : "")}
-          </p>
-        </div>
-        <div class="topbar__actions">
-          <button class="btn btn--ghost" data-action="export">Export</button>
-          <a class="btn btn--primary" href="#/t/${tournament.id}/print">Print</a>
-        </div>
-      </div>
-      <div class="progress" title="${p.done} of ${p.total} matches played">
-        <div class="progress__bar" style="width:${p.pct}%"></div>
+        <a class="iconbtn" href="#/" title="All tournaments" aria-label="All tournaments">‹</a>
+        <h1 class="topbar__name" title="${tournament.name}">${tournament.name}</h1>
+        ${raw(
+          p.total
+            ? `<button type="button" class="topbar__count" data-action="next-match" title="${p.done} of ${p.total} played — tap for the next result">${p.done}/${p.total}</button>`
+            : ""
+        )}
+        <details class="menu">
+          <summary class="iconbtn" title="More" aria-label="More actions">⋯</summary>
+          <div class="menu__list">
+            <a class="menu__item" href="#/t/${tournament.id}/print">Print / Save as PDF</a>
+            <button type="button" class="menu__item" data-action="export">Export as JSON</button>
+            <button type="button" class="menu__item" data-action="duplicate-current">Duplicate tournament</button>
+            <button type="button" class="menu__item menu__item--danger" data-action="delete-current">Delete tournament</button>
+          </div>
+        </details>
       </div>
       <nav class="tabs">
         ${tabs.map(
           (tab) => html`<a class="tab${raw(tab.id === view ? " is-active" : "")}" href="#/t/${tournament.id}/${tab.id}">${tab.label}</a>`
         )}
-        <span class="tabs__count">${p.done}/${p.total} matches</span>
       </nav>
+      <div class="progress" aria-hidden="true"><div class="progress__bar" style="width:${p.pct}%"></div></div>
     </header>`;
 }
 
@@ -139,6 +141,8 @@ export function openScoreDialog(matchId) {
 
   const dialog = $("#score-dialog");
   const maxSets = tournament.settings.bestOf;
+  const next = nextPlayable(matchId);
+  const remaining = model.upcomingMatches(tournament).filter((m) => m.id !== matchId).length;
   const rows = Array.from({ length: maxSets }, (_, i) => {
     const set = match.sets[i] || ["", ""];
     return html`<div class="setrow">
@@ -157,7 +161,7 @@ export function openScoreDialog(matchId) {
         <span class="muted">v</span>
         <span>${model.playerName(tournament, match.p2)}</span>
       </h2>
-      <p class="muted">Best of ${maxSets} · first to ${tournament.settings.pointsPerSet}, win by two</p>
+      <p class="muted">Best of ${maxSets} · first to ${tournament.settings.pointsPerSet}, win by two${raw(remaining ? ` · ${remaining} more to play` : "")}</p>
     </header>
     <div class="dialog__body">
       <div class="setrows">${rows}</div>
@@ -169,10 +173,15 @@ export function openScoreDialog(matchId) {
         <button type="button" class="btn btn--ghost btn--small" data-dialog="walkover" data-winner="${match.p1}">w/o ${model.playerName(tournament, match.p1)}</button>
         <button type="button" class="btn btn--ghost btn--small" data-dialog="walkover" data-winner="${match.p2}">w/o ${model.playerName(tournament, match.p2)}</button>
         ${raw(match.winnerId ? '<button type="button" class="btn btn--ghost btn--small btn--danger" data-dialog="clear">Clear</button>' : "")}
+        <button type="button" class="btn btn--ghost btn--small" data-dialog="cancel">Close</button>
       </div>
       <div class="dialog__foot-right">
-        <button type="button" class="btn btn--ghost" data-dialog="cancel">Cancel</button>
-        <button type="button" class="btn btn--primary" data-dialog="save">Save result</button>
+        <button type="button" class="btn${raw(next ? "" : " btn--primary")}" data-dialog="save">Save</button>
+        ${raw(
+          next
+            ? `<button type="button" class="btn btn--primary" data-dialog="save-next" title="Save and open ${esc(sideName(tournament, next, 1))} v ${esc(sideName(tournament, next, 2))}">Save &amp; next ›</button>`
+            : ""
+        )}
       </div>
     </footer>
   </form>`;
@@ -185,6 +194,11 @@ export function openScoreDialog(matchId) {
     first.select();
   }
   validateDialog();
+}
+
+/** The next match that can actually be played, skipping the one in hand. */
+function nextPlayable(exceptId) {
+  return model.upcomingMatches(state.tournament).find((match) => match.id !== exceptId) || null;
 }
 
 function matchStage(tournament, match) {
@@ -263,8 +277,9 @@ function focusNext(fromRow) {
       return;
     }
   }
-  const save = $("#score-dialog").querySelector('[data-dialog="save"]');
-  if (save) save.focus({ preventScroll: true });
+  const dialog = $("#score-dialog");
+  const primary = dialog.querySelector('[data-dialog="save-next"]') || dialog.querySelector('[data-dialog="save"]');
+  if (primary) primary.focus({ preventScroll: true });
 }
 
 /**
@@ -324,6 +339,7 @@ function validateDialog() {
     return null;
   }
   const match = state.tournament.matches.find((m) => m.id === dialogMatchId);
+  if (!match) return null;
   const winner = result.winnerSide === 0 ? match.p1 : match.p2;
   status.textContent = `${model.playerName(state.tournament, winner)} wins ${Math.max(...result.setWins)}–${Math.min(...result.setWins)}`;
   status.className = "dialog__status is-ok";
@@ -347,10 +363,11 @@ function wireDialog() {
 
   dialog.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
-    event.preventDefault();
     const active = document.activeElement;
+    if (active && active.tagName === "BUTTON") return; // let the button fire itself
+    event.preventDefault();
     if (!active || !active.classList.contains("score-input")) {
-      saveDialog();
+      primaryAction();
       return;
     }
     const row = active.closest(".setrow");
@@ -368,6 +385,7 @@ function wireDialog() {
     const action = target.dataset.dialog;
     if (action === "cancel") closeDialog();
     if (action === "save") saveDialog();
+    if (action === "save-next") saveDialog({ goNext: true });
     if (action === "clear") {
       model.clearResult(state.tournament, dialogMatchId);
       save();
@@ -385,12 +403,15 @@ function wireDialog() {
     }
   });
 
+  // close() fires this from a queued task, by which point saving-and-next may
+  // already have opened the following match. Only forget the match if the
+  // dialog really is closed.
   dialog.addEventListener("close", () => {
-    dialogMatchId = null;
+    if (!dialog.open) dialogMatchId = null;
   });
 }
 
-function saveDialog() {
+function saveDialog({ goNext = false } = {}) {
   const result = validateDialog();
   if (!result) {
     toast("That score is not a complete, legal result yet.", "error");
@@ -399,9 +420,18 @@ function saveDialog() {
   const outcome = model.recordResult(state.tournament, dialogMatchId, readDialogSets());
   if (!outcome.ok) return toast(outcome.error, "error");
   save();
+  const next = goNext ? nextPlayable(dialogMatchId) : null;
   closeDialog();
   render();
-  toast("Result saved");
+  if (next) openScoreDialog(next.id);
+  else toast("Result saved");
+}
+
+/** Enter on a filled-in match does whatever the primary button says. */
+function primaryAction() {
+  const dialog = $("#score-dialog");
+  const button = dialog.querySelector('[data-dialog="save-next"]') || dialog.querySelector('[data-dialog="save"]');
+  saveDialog({ goNext: !!(button && button.dataset.dialog === "save-next") });
 }
 
 /* ------------------------------------------------------------------ *
@@ -413,6 +443,8 @@ function wireGlobal() {
 
   on(app, "click", "[data-action]", (event, target) => {
     const action = target.dataset.action;
+    const menu = target.closest("details.menu");
+    if (menu) menu.removeAttribute("open");
     const view = VIEWS[state.view];
     if (action === "score") {
       openScoreDialog(target.dataset.match);
@@ -422,6 +454,27 @@ function wireGlobal() {
       download(`${slugify(state.tournament.name)}.json`, store.exportJSON(state.tournament));
       return;
     }
+    if (action === "next-match") {
+      const next = nextPlayable(null);
+      if (next) openScoreDialog(next.id);
+      else toast("Every match that can be played is done.");
+      return;
+    }
+    if (action === "duplicate-current") {
+      const copy = store.duplicate(state.tournament);
+      navigate(`#/t/${copy.id}/setup`);
+      toast("Copy created");
+      return;
+    }
+    if (action === "delete-current") {
+      const name = state.tournament.name;
+      if (!confirm(`Delete “${name}” and all its scores? This cannot be undone.`)) return;
+      store.remove(state.tournament.id);
+      state.tournament = null;
+      navigate("#/");
+      toast("Tournament deleted");
+      return;
+    }
     if (state.view === "home") {
       home.handle(action, target, event);
       return;
@@ -429,9 +482,22 @@ function wireGlobal() {
     if (view && view.handle) view.handle(action, target, event);
   });
 
-  on(app, "click", ".bnode[data-match]", (event, target) => {
+  // Whole match cards and bracket nodes open the score dialog.
+  on(app, "click", ".bnode[data-match], .match[data-match]", (event, target) => {
     if (event.target.closest("[data-action]")) return;
     openScoreDialog(target.dataset.match);
+  });
+
+  on(app, "keydown", ".match[data-match], .bnode[data-match]", (event, target) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    openScoreDialog(target.dataset.match);
+  });
+
+  document.addEventListener("click", (event) => {
+    $$("details.menu[open]").forEach((open) => {
+      if (!open.contains(event.target)) open.removeAttribute("open");
+    });
   });
 
   on(app, "input", "input[type=text], input[type=date], textarea", (event, target) => {

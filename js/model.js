@@ -2,9 +2,9 @@
 import { uid } from "./util.js";
 
 export const FORMATS = {
-  roundrobin: { label: "Round robin", description: "Everyone plays everyone. Final placing from the table." },
-  groups_ko: { label: "Groups + knockout", description: "Group stage, then the best advance to a knockout bracket." },
-  knockout: { label: "Knockout", description: "Straight single-elimination bracket." },
+  roundrobin: { label: "Round robin", short: "Round robin", description: "Everyone plays everyone. Final placing from the table." },
+  groups_ko: { label: "Groups + knockout", short: "Groups + KO", description: "Group stage, then the best advance to a knockout bracket." },
+  knockout: { label: "Knockout", short: "Knockout", description: "Straight single-elimination bracket." },
 };
 
 export const BEST_OF_OPTIONS = [1, 3, 5, 7, 9];

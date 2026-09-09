@@ -22,31 +22,34 @@ export function render(t) {
         <label for="f-name">Tournament name</label>
         <input id="f-name" type="text" data-field="name" value="${t.name}" placeholder="Club championship" />
       </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="f-date">Date</label>
-          <input id="f-date" type="date" data-field="date" value="${t.date}" />
+      <details class="tuck" ${raw(t.venue ? "open" : "")}>
+        <summary>Date and venue</summary>
+        <div class="field-row field-row--tight">
+          <div class="field">
+            <label for="f-date">Date</label>
+            <input id="f-date" type="date" data-field="date" value="${t.date}" />
+          </div>
+          <div class="field">
+            <label for="f-venue">Venue</label>
+            <input id="f-venue" type="text" data-field="venue" value="${t.venue}" placeholder="Sports hall" />
+          </div>
         </div>
-        <div class="field">
-          <label for="f-venue">Venue</label>
-          <input id="f-venue" type="text" data-field="venue" value="${t.venue}" placeholder="Sports hall" />
-        </div>
-      </div>
+      </details>
     </section>
 
     <section class="card">
       <h2 class="card__title">Format</h2>
-      <div class="formats">
+      <div class="segmented" role="radiogroup" aria-label="Format">
         ${Object.entries(model.FORMATS).map(
-          ([key, format]) => html`<label class="pick${raw(t.format === key ? " is-active" : "")}">
+          ([key, format]) => html`<label class="seg${raw(t.format === key ? " is-active" : "")}">
             <input type="radio" name="format" value="${key}" data-field="format" ${raw(t.format === key ? "checked" : "")} />
-            <span class="pick__label">${format.label}</span>
-            <span class="pick__desc">${format.description}</span>
+            <span>${format.short}</span>
           </label>`
         )}
       </div>
+      <p class="hint hint--format">${model.FORMATS[t.format].description}</p>
 
-      <div class="field-row">
+      <div class="field-row field-row--tight">
         <div class="field">
           <label for="f-bestof">Match length</label>
           <select id="f-bestof" data-field="bestOf">
@@ -63,7 +66,7 @@ export function render(t) {
 
       ${raw(
         t.format === "groups_ko"
-          ? html`<div class="field-row">
+          ? html`<div class="field-row field-row--tight">
               <div class="field">
                 <label for="f-groups">Number of groups</label>
                 <select id="f-groups" data-field="groupCount">
@@ -121,10 +124,16 @@ export function render(t) {
     <section class="card card--players">
       <h2 class="card__title">Players <span class="count">${t.players.length}</span></h2>
       <form class="player-form" data-form="add-player" autocomplete="off">
-        <input type="text" name="name" placeholder="Player name" aria-label="Player name" required />
-        <input type="text" name="club" placeholder="Club (optional)" aria-label="Club" />
+        <textarea
+          class="player-input"
+          name="entry"
+          rows="1"
+          placeholder="Add player — name, club"
+          aria-label="Player name, optionally followed by a comma and a club"
+        ></textarea>
         <button class="btn btn--primary" type="submit">Add</button>
       </form>
+      <p class="hint">Enter adds. Paste a list to add several at once — one per line.</p>
 
       ${raw(
         t.players.length
@@ -132,23 +141,16 @@ export function render(t) {
               ${t.players.map(
                 (p) => html`<li class="players__row">
                   <span class="players__seed">${p.seed}</span>
-                  <span class="players__name">${p.name}</span>
+                  <button type="button" class="players__name" data-action="rename-player" data-id="${p.id}" title="Rename ${p.name}">
+                    ${p.name}
+                  </button>
                   <span class="players__club muted">${p.club}</span>
-                  <button class="icon-btn" data-action="remove-player" data-id="${p.id}" title="Remove ${p.name}" aria-label="Remove ${p.name}">✕</button>
+                  <button type="button" class="icon-btn" data-action="remove-player" data-id="${p.id}" title="Remove ${p.name}" aria-label="Remove ${p.name}">✕</button>
                 </li>`
               )}
             </ol>`
-          : '<p class="muted">No players yet. Add them one at a time, or paste a list below.</p>'
+          : '<p class="muted">No players yet. Type a name, or paste a list.</p>'
       )}
-
-      <details class="bulk" ${raw(t.players.length ? "" : "open")}>
-        <summary>Paste a list of players</summary>
-        <form data-form="bulk-players">
-          <textarea name="bulk" rows="6" placeholder="One player per line&#10;Ann Svensson&#10;Bo Nilsson, TTK Rekord"></textarea>
-          <p class="hint">One per line. Add a club after a comma.</p>
-          <button class="btn" type="submit">Add all</button>
-        </form>
-      </details>
     </section>
   </div>`;
 }
@@ -200,33 +202,76 @@ export function change(field, target) {
 
 export function submit(form, element) {
   const t = state.tournament;
-  const data = new FormData(element);
-  if (form === "add-player") {
-    const player = model.addPlayer(t, data.get("name"), data.get("club"));
-    if (!player) return;
-    save();
+  if (form !== "add-player") return;
+  const entry = String(new FormData(element).get("entry") || "");
+  const lines = entry.split("\n").map((line) => line.trim()).filter(Boolean);
+  let added = 0;
+  lines.forEach((line) => {
+    const [name, ...rest] = line.split(/[,;\t]/);
+    if (model.addPlayer(t, name, rest.join(",").trim())) added += 1;
+  });
+  if (!added) return;
+  save();
+  rerender();
+  if (added > 1) toast(`Added ${added} players`);
+  const input = document.querySelector(".player-input");
+  if (input) input.focus({ preventScroll: true });
+}
+
+/** Keeps the one-line entry field usable: Enter adds, paste grows it. */
+export function afterRender() {
+  const input = document.querySelector(".player-input");
+  if (!input) return;
+  const grow = () => {
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 150)}px`;
+  };
+  input.addEventListener("input", grow);
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    if (input.form) input.form.requestSubmit();
+  });
+  grow();
+}
+
+function renamePlayer(target) {
+  const t = state.tournament;
+  const player = model.playerById(t, target.dataset.id);
+  if (!player) return;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "players__edit";
+  input.value = player.name;
+  input.setAttribute("aria-label", `Rename ${player.name}`);
+  target.replaceWith(input);
+  input.focus({ preventScroll: true });
+  input.select();
+
+  let done = false;
+  const finish = (keep) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    if (keep && name && name !== player.name) {
+      player.name = name;
+      save();
+    }
     rerender();
-    const input = document.querySelector('.player-form input[name="name"]');
-    if (input) input.focus({ preventScroll: true });
-  }
-  if (form === "bulk-players") {
-    const lines = String(data.get("bulk") || "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-    let added = 0;
-    lines.forEach((line) => {
-      const [name, club] = line.split(/[,;\t]/);
-      if (model.addPlayer(t, name, club || "")) added += 1;
-    });
-    save();
-    rerender();
-    toast(`Added ${added} player${added === 1 ? "" : "s"}`);
-  }
+  };
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") finish(true);
+    if (event.key === "Escape") finish(false);
+  });
+  input.addEventListener("blur", () => finish(true));
 }
 
 export function handle(action, target) {
   const t = state.tournament;
+  if (action === "rename-player") {
+    renamePlayer(target);
+    return;
+  }
   if (action === "remove-player") {
     if (t.matches.length && !confirmRedraw(t, "Removing a player")) return;
     model.removePlayer(t, target.dataset.id);

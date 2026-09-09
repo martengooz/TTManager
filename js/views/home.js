@@ -12,7 +12,7 @@ export function render() {
         <img src="icons/icon.svg" alt="" width="48" height="48" />
         <div>
           <h1>TT Manager</h1>
-          <p>Set up a table tennis tournament, record every score, print the whole thing.</p>
+          ${raw(tournaments.length ? "" : "<p>Set up a table tennis tournament, record every score, print the whole thing.</p>")}
         </div>
       </div>
       <div class="hero__actions">
@@ -38,21 +38,22 @@ export function render() {
                       ${model.FORMATS[t.format].label} · ${t.players.length} players
                       ${raw(t.date ? ` · ${esc(formatDate(t.date))}` : "")}
                     </span>
-                    <span class="tlist__status">
-                      ${raw(
-                        champion
-                          ? `<span class="tag tag--ok tag--champ">🏆 ${esc(model.playerName(t, champion.playerId))}</span>`
-                          : p.total
-                          ? `<span class="tag">${p.done}/${p.total} matches</span>`
-                          : '<span class="tag">not drawn</span>'
-                      )}
-                    </span>
                   </a>
-                  <div class="tlist__actions">
-                    <button class="btn btn--small btn--ghost" data-action="duplicate" data-id="${t.id}" title="Duplicate">Copy</button>
-                    <button class="btn btn--small btn--ghost" data-action="export-one" data-id="${t.id}" title="Export as JSON">Export</button>
-                    <button class="btn btn--small btn--ghost btn--danger" data-action="delete" data-id="${t.id}" title="Delete">Delete</button>
-                  </div>
+                  ${raw(
+                    champion
+                      ? `<span class="tag tag--ok tag--champ">🏆 ${esc(model.playerName(t, champion.playerId))}</span>`
+                      : p.total
+                      ? `<span class="tag">${p.done}/${p.total}</span>`
+                      : '<span class="tag">not drawn</span>'
+                  )}
+                  <details class="menu">
+                    <summary class="iconbtn" title="More" aria-label="More actions for ${t.name}">⋯</summary>
+                    <div class="menu__list">
+                      <button type="button" class="menu__item" data-action="duplicate" data-id="${t.id}">Duplicate</button>
+                      <button type="button" class="menu__item" data-action="export-one" data-id="${t.id}">Export as JSON</button>
+                      <button type="button" class="menu__item menu__item--danger" data-action="delete" data-id="${t.id}">Delete</button>
+                    </div>
+                  </details>
                 </li>`;
               })}
             </ul>
@@ -67,14 +68,18 @@ export function render() {
           </section>`
     )}
 
-    <section class="cards">
-      ${Object.entries(model.FORMATS).map(
-        ([key, format]) => html`<div class="card card--info">
-          <h3>${format.label}</h3>
-          <p class="muted">${format.description}</p>
-        </div>`
-      )}
-    </section>
+    ${raw(
+      tournaments.length
+        ? ""
+        : html`<section class="cards">
+            ${Object.entries(model.FORMATS).map(
+              ([key, format]) => html`<div class="card card--info">
+                <h3>${format.label}</h3>
+                <p class="muted">${format.description}</p>
+              </div>`
+            )}
+          </section>`
+    )}
 
     <footer class="home__foot muted">
       Scores follow the standard rules: sets to 11, win by two, best of 3/5/7. Install the app from your
@@ -86,7 +91,16 @@ export function render() {
 
 export function handle(action, target) {
   if (action === "new") {
-    const tournament = store.save(model.createTournament({ name: `Tournament ${new Date().toLocaleDateString()}` }));
+    // Carry over the last tournament's format and rules: a club runs the same
+    // shape of event week after week.
+    const previous = store.list()[0];
+    const tournament = model.createTournament({
+      name: `Tournament ${new Date().toLocaleDateString()}`,
+      venue: previous ? previous.venue : "",
+      format: previous ? previous.format : undefined,
+      ...(previous ? previous.settings : {}),
+    });
+    store.save(tournament);
     navigate(`#/t/${tournament.id}/setup`);
   }
   if (action === "delete") {

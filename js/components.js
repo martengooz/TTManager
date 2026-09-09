@@ -31,42 +31,38 @@ export function matchTitle(tournament, match) {
   return match.label;
 }
 
-/** One match card. `interactive` adds the scoring buttons. */
-export function matchCard(tournament, match, { interactive = true, number = null } = {}) {
+/** One match card. The whole card is the tap target - no separate button. */
+export function matchCard(tournament, match, { interactive = true, number = null, showStage = true } = {}) {
   const [setsA, setsB] = setWinsFromSets(match.sets);
   const played = match.status === "played";
   const decided = !!match.winnerId;
-  const scoreA = played ? setsA : match.status === "walkover" && match.winnerId === match.p1 ? "w/o" : "";
-  const scoreB = played ? setsB : match.status === "walkover" && match.winnerId === match.p2 ? "w/o" : "";
+  const walkover = match.status === "walkover";
+  const score = (playerId, sets) => (played ? sets : walkover && match.winnerId === playerId ? "w/o" : "");
   const winnerClass = (playerId) => (decided && match.winnerId === playerId ? " is-winner" : decided ? " is-loser" : "");
 
-  const actions = interactive
-    ? html`<div class="match__actions">
-        <button class="btn btn--small" data-action="score" data-match="${match.id}" ${raw(match.p1 && match.p2 ? "" : "disabled")}>
-          ${decided ? "Edit score" : "Enter score"}
-        </button>
-      </div>`
-    : "";
-
-  return html`<article class="match${raw(decided ? " match--done" : "")}${raw(match.status === "bye" ? " match--bye" : "")}" data-match="${match.id}">
+  return html`<article
+    class="match${raw(decided ? " match--done" : "")}${raw(match.status === "bye" ? " match--bye" : "")}"
+    data-match="${match.id}"
+    ${raw(interactive ? 'role="button" tabindex="0"' : "")}
+  >
     <header class="match__meta">
       <span class="match__no">${number != null ? `#${number}` : ""}</span>
-      <span>${matchTitle(tournament, match)}</span>
+      ${raw(showStage ? `<span class="match__stage">${esc(matchTitle(tournament, match))}</span>` : "")}
       ${raw(match.status === "bye" ? '<span class="tag">bye</span>' : "")}
-      ${raw(match.status === "walkover" ? '<span class="tag">walkover</span>' : "")}
+      ${raw(walkover ? '<span class="tag">w/o</span>' : "")}
+      ${raw(interactive ? `<span class="match__cta">${decided ? "Edit" : "Enter score"}</span>` : "")}
     </header>
     <div class="match__players">
       <div class="side${raw(winnerClass(match.p1))}">
         <span class="side__name">${sideName(tournament, match, 1)}</span>
-        <span class="side__score">${scoreA}</span>
+        <span class="side__score">${score(match.p1, setsA)}</span>
       </div>
       <div class="side${raw(winnerClass(match.p2))}">
         <span class="side__name">${sideName(tournament, match, 2)}</span>
-        <span class="side__score">${scoreB}</span>
+        <span class="side__score">${score(match.p2, setsB)}</span>
       </div>
     </div>
-    <div class="match__sets">${setsLine(match) || (interactive ? "" : " ")}</div>
-    ${raw(actions)}
+    ${raw(match.sets.length ? `<div class="match__sets">${esc(setsLine(match))}</div>` : "")}
   </article>`;
 }
 

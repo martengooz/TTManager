@@ -40,7 +40,7 @@ export function render(t) {
         </h2>
         ${raw(
           shown.length
-            ? `<div class="matchgrid">${shown.map((m) => matchCard(t, m, { number: numbering.get(m.id) })).join("")}</div>`
+            ? `<div class="matchgrid">${shown.map((m) => matchCard(t, m, { number: numbering.get(m.id), showStage: false })).join("")}</div>`
             : '<p class="muted">Nothing here with the current filter.</p>'
         )}
       </section>`;
@@ -56,7 +56,7 @@ export function render(t) {
             <h2 class="card__title">${round.name}</h2>
             ${raw(
               shown.length
-                ? `<div class="matchgrid">${shown.map((m) => matchCard(t, m, { number: numbering.get(m.id) })).join("")}</div>`
+                ? `<div class="matchgrid">${shown.map((m) => matchCard(t, m, { number: numbering.get(m.id), showStage: false })).join("")}</div>`
                 : '<p class="muted">Nothing here with the current filter.</p>'
             )}
           </section>`;
@@ -66,7 +66,7 @@ export function render(t) {
   if (third && state.groupFilter === "all" && visible(t, [third]).length) {
     koSections.push(html`<section class="card">
       <h2 class="card__title">Third place</h2>
-      <div class="matchgrid">${raw(matchCard(t, third, { number: numbering.get(third.id) }))}</div>
+      <div class="matchgrid">${raw(matchCard(t, third, { number: numbering.get(third.id), showStage: false }))}</div>
     </section>`);
   }
 
@@ -77,23 +77,20 @@ export function render(t) {
   ];
 
   return html`<div class="toolbar">
-      <div class="chips">
-        ${chips.map(
-          (chip) => html`<button class="chip${raw(state.filter === chip.id ? " is-active" : "")}" data-action="filter" data-value="${chip.id}">
-            ${chip.label}
-          </button>`
-        )}
-      </div>
+      ${chips.map(
+        (chip) => html`<button class="chip${raw(state.filter === chip.id ? " is-active" : "")}" data-action="filter" data-value="${chip.id}">
+          ${chip.label}
+        </button>`
+      )}
       ${raw(
         t.groups.length > 1
-          ? html`<div class="chips">
+          ? html`<span class="toolbar__sep" aria-hidden="true"></span>
               <button class="chip${raw(state.groupFilter === "all" ? " is-active" : "")}" data-action="group-filter" data-value="all">All groups</button>
               ${t.groups.map(
                 (group) => html`<button class="chip${raw(state.groupFilter === group.id ? " is-active" : "")}" data-action="group-filter" data-value="${group.id}">
-                  ${group.name}
+                  ${group.name.replace(/^Group /, "")}
                 </button>`
-              )}
-            </div>`
+              )}`
           : ""
       )}
     </div>
