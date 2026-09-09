@@ -466,6 +466,20 @@ export function refresh(tournament) {
       }
     }
 
+    // A third place match behind a bye semi-final can never be played: the
+    // beaten semi-finalist takes third and nobody plays for fourth.
+    if (match.thirdPlace) {
+      const feeders = [match.p1Source, match.p2Source]
+        .map((source) => (source ? tournament.matches.find((m) => m.id === source.matchId) : null))
+        .filter(Boolean);
+      if (feeders.some((feeder) => feeder.status === "bye")) {
+        match.status = "bye";
+        match.sets = [];
+        match.winnerId = p1 || p2 || null;
+        match.loserId = null;
+      }
+    }
+
     // A first round slot with no source at all is a bye: the other side walks
     // on. It stays a bye even before the entrant is known, so it never counts
     // as a match to play.

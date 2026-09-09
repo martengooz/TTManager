@@ -12,6 +12,8 @@ export function render(t) {
   const drawn = t.matches.length > 0;
   const played = t.matches.some((m) => m.winnerId && m.status !== "bye");
   const maxGroups = Math.max(1, Math.floor(t.players.length / 2));
+  const inDraw = new Set(t.matches.flatMap((m) => [m.p1, m.p2]).concat(t.groups.flatMap((g) => g.playerIds)));
+  const missing = drawn ? t.players.filter((p) => !inDraw.has(p.id)).length : 0;
 
   return html`<div class="grid grid--setup">
     <section class="card">
@@ -105,7 +107,9 @@ export function render(t) {
         </button>
         ${raw(drawn ? `<a class="btn btn--ghost" href="#/t/${t.id}/matches">Go to matches</a>` : "")}
         ${raw(
-          played
+          missing
+            ? `<p class="hint hint--warn">${missing} player${missing === 1 ? " was" : "s were"} added after the draw — draw again to include ${missing === 1 ? "them" : "them all"}.</p>`
+            : played
             ? '<p class="hint hint--warn">Drawing again clears every score that has been recorded.</p>'
             : t.players.length < 2
             ? '<p class="hint">Add at least two players first.</p>'
@@ -166,15 +170,25 @@ function previewText(t) {
   return `${groups} group${groups === 1 ? "" : "s"} · ${matches} group matches${koPart}.`;
 }
 
+/** True when scores would be lost, and the user said go ahead anyway. */
+function confirmRedraw(t, what) {
+  if (!t.matches.some((m) => m.winnerId && m.status !== "bye")) return true;
+  return confirm(`${what} clears the current draw and every score recorded so far. Continue?`);
+}
+
 export function change(field, target) {
   const t = state.tournament;
   const value = target.type === "checkbox" ? target.checked : target.value;
   if (["name", "date", "venue", "format"].includes(field)) {
-    t[field] = value;
-    if (field === "format") {
+    if (field === "format" && t.matches.length) {
+      if (!confirmRedraw(t, "Changing the format")) {
+        rerender();
+        return;
+      }
       t.matches = [];
       t.groups = [];
     }
+    t[field] = value;
   } else if (["bestOf", "pointsPerSet", "groupCount", "advancePerGroup"].includes(field)) {
     t.settings[field] = Number(value);
   } else {
@@ -214,17 +228,15 @@ export function submit(form, element) {
 export function handle(action, target) {
   const t = state.tournament;
   if (action === "remove-player") {
+    if (t.matches.length && !confirmRedraw(t, "Removing a player")) return;
     model.removePlayer(t, target.dataset.id);
-    if (t.matches.length) {
-      t.matches = [];
-      t.groups = [];
-    }
+    t.matches = [];
+    t.groups = [];
     save();
     rerender();
   }
   if (action === "draw") {
-    const played = t.matches.some((m) => m.winnerId && m.status !== "bye");
-    if (played && !confirm("Drawing again clears every recorded score. Continue?")) return;
+    if (!confirmRedraw(t, "Drawing again")) return;
     model.drawTournament(t);
     save();
     toast("Draw complete");

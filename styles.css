@@ -116,6 +116,7 @@ a { color: inherit; }
 }
 .tag--ok { background: var(--win-soft); border-color: #bfe3cd; color: var(--win); }
 .tag--q { background: var(--accent-soft); border-color: #c5dcf1; color: var(--accent); }
+.tag--champ { text-transform: none; font-size: 0.78rem; letter-spacing: 0; }
 
 /* ---------------------------------------------------------------- Layout */
 

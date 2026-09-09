@@ -41,7 +41,7 @@ export function render() {
                     <span class="tlist__status">
                       ${raw(
                         champion
-                          ? `<span class="tag tag--ok">🏆 ${esc(model.playerName(t, champion.playerId))}</span>`
+                          ? `<span class="tag tag--ok tag--champ">🏆 ${esc(model.playerName(t, champion.playerId))}</span>`
                           : p.total
                           ? `<span class="tag">${p.done}/${p.total} matches</span>`
                           : '<span class="tag">not drawn</span>'
