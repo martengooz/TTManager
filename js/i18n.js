@@ -190,8 +190,8 @@ const SV = {
     "Bäst av {n} · först till {points}, vinst med två · {left} kvar att spela",
   "Set {n}": "Set {n}",
   "Set {n}, {player}": "Set {n}, {player}",
-  "Type the loser's points and the winning score fills itself. Enter {points} or more and the other side is up to you.":
-    "Skriv förlorarens bollar så fylls vinnarsiffran i. Skriver du {points} eller mer får du fylla i andra sidan själv.",
+  "Type the loser's points and the winning score fills itself. Enter {points} or more and the other side is up to you. Enter moves on.":
+    "Skriv förlorarens bollar så fylls vinnarsiffran i. Skriver du {points} eller mer får du fylla i andra sidan själv. Enter går vidare.",
   "Enter the points for each set.": "Fyll i bollarna för varje set.",
   "{player} wins {won}–{lost}": "{player} vinner {won}–{lost}",
   "Save": "Spara",
@@ -247,7 +247,7 @@ const SV = {
     "Expert visar mer på skärmen. Standard ger allt mer luft.",
   "Score entry": "Resultatinmatning",
   "Fill in the score the rules imply": "Fyll i resultatet som reglerna ger",
-  "Jump to the next field when a set is settled": "Hoppa till nästa fält när ett set är klart",
+  "Enter moves on to the next score": "Enter går vidare till nästa siffra",
   "Open the next unplayed match after saving": "Öppna nästa ospelade match efter sparande",
   "Matches are often reported out of order, so this is off by default.":
     "Matcher rapporteras ofta i annan ordning, så det här är avstängt från början.",

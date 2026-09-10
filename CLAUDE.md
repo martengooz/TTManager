@@ -66,5 +66,8 @@ into words at render time, so switching language re-labels saved tournaments too
 - Scoring rules live in `isValidSet` and `validateResult`. A set ends at the target with a
   two point margin, or by exactly two after deuce; the score dialog fills in whatever those
   rules already determine.
+- Typing in the score dialog never moves the focus — any digit can be the start of a longer
+  number, so guessing when a score is finished always gets some entry wrong. Enter is the
+  signal, and `advanceFrom` decides where it goes.
 - `.github/workflows/pages.yml` deploys the repository root to GitHub Pages on every push to
   `main`. Pages must be set to the *GitHub Actions* source in the repository settings.

@@ -169,7 +169,7 @@ export function openScoreDialog(matchId) {
       <div class="setrows">${rows}</div>
       ${raw(
         settings.get().autoFill
-          ? `<p class="dialog__hint">${esc(t("Type the loser's points and the winning score fills itself. Enter {points} or more and the other side is up to you.", { points: tournament.settings.pointsPerSet }))}</p>`
+          ? `<p class="dialog__hint">${esc(t("Type the loser's points and the winning score fills itself. Enter {points} or more and the other side is up to you. Enter moves on.", { points: tournament.settings.pointsPerSet }))}</p>`
           : ""
       )}
       <p class="dialog__status" id="score-status"></p>
@@ -225,11 +225,6 @@ function impliedOpponent(value, pointsPerSet) {
   return null;
 }
 
-/** "1" may still be on its way to 10-19, so do not jump off it yet. */
-function mayGrow(value, pointsPerSet) {
-  return value >= 1 && value * 10 <= pointsPerSet + 9;
-}
-
 function rowInputs(row) {
   return Array.from(row.querySelectorAll(".score-input"));
 }
@@ -252,7 +247,11 @@ function clearAuto(input) {
   input.classList.remove("is-auto");
 }
 
-/** Fills in whatever the typed score forces, and moves on when it is settled. */
+/**
+ * Fills in whatever the typed score forces. Typing never moves the focus:
+ * a digit can always be the start of a longer number, so only Enter says a
+ * score is finished.
+ */
 function handleScoreInput(input) {
   const { pointsPerSet } = state.tournament.settings;
   const row = input.closest(".setrow");
@@ -269,25 +268,52 @@ function handleScoreInput(input) {
   }
 
   updateRowStates();
-
-  const complete = inputValue(left) !== null && inputValue(right) !== null;
-  if (settings.get().autoAdvance && complete && value !== null && !mayGrow(value, pointsPerSet)) focusNext(row);
 }
 
-/** Focus the next score still worth typing, or the save button when done. */
-function focusNext(fromRow) {
-  const rows = Array.from($("#score-dialog").querySelectorAll(".setrow"));
-  for (let i = rows.indexOf(fromRow) + 1; i < rows.length; i += 1) {
-    const next = rowInputs(rows[i]).find((input) => !input.disabled && input.value.trim() === "");
-    if (next) {
-      next.focus({ preventScroll: true });
-      next.select();
+/** Every score field in the dialog, in the order they are filled in. */
+function allScoreInputs() {
+  return Array.from($("#score-dialog").querySelectorAll(".score-input"));
+}
+
+function focusInput(input) {
+  input.focus({ preventScroll: true });
+  input.select();
+}
+
+/** Focus the first score still to be typed from `startIndex` on, else Save. */
+function focusFrom(startIndex) {
+  const inputs = allScoreInputs();
+  for (let i = startIndex; i < inputs.length; i += 1) {
+    if (!inputs[i].disabled && inputs[i].value.trim() === "") {
+      focusInput(inputs[i]);
       return;
     }
   }
   const dialog = $("#score-dialog");
   const primary = dialog.querySelector('[data-dialog="save-next"]') || dialog.querySelector('[data-dialog="save"]');
   if (primary) primary.focus({ preventScroll: true });
+}
+
+/**
+ * Enter says "that score is finished". A settled set moves on to the next one;
+ * a half-typed set moves to the score still missing; and a set that cannot
+ * have happened stays put, so the score can be corrected where it went wrong.
+ */
+function advanceFrom(input) {
+  const { pointsPerSet } = state.tournament.settings;
+  const row = input.closest(".setrow");
+  const rows = Array.from($("#score-dialog").querySelectorAll(".setrow"));
+  const [left, right] = rowInputs(row);
+  const a = inputValue(left);
+  const b = inputValue(right);
+  const inputs = allScoreInputs();
+
+  if (a !== null && b !== null) {
+    if (!model.isValidSet(a, b, pointsPerSet)) return; // not a score that can happen
+    focusFrom((rows.indexOf(row) + 1) * 2);
+    return;
+  }
+  focusFrom(inputs.indexOf(input) + 1);
 }
 
 /**
@@ -382,15 +408,7 @@ function wireDialog() {
       primaryAction();
       return;
     }
-    const row = active.closest(".setrow");
-    const [left, right] = rowInputs(row);
-    const other = active === left ? right : left;
-    if (inputValue(other) === null && !other.disabled) {
-      other.focus({ preventScroll: true });
-      other.select();
-      return;
-    }
-    focusNext(row);
+    if (settings.get().autoAdvance) advanceFrom(active);
   });
 
   on(dialog, "click", "[data-dialog]", (event, target) => {
@@ -512,7 +530,7 @@ export function openSettingsDialog() {
       <section class="setting">
         <h3>${t("Score entry")}</h3>
         ${raw(switchRow("autoFill", "Fill in the score the rules imply", now.autoFill))}
-        ${raw(switchRow("autoAdvance", "Jump to the next field when a set is settled", now.autoAdvance))}
+        ${raw(switchRow("autoAdvance", "Enter moves on to the next score", now.autoAdvance))}
         ${raw(
           switchRow(
             "chainNext",
