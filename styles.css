@@ -346,7 +346,7 @@ a { color: inherit; }
 .field label { font-size: 0.83rem; font-weight: 600; color: var(--muted); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 
-input[type="text"], input[type="date"], input[type="number"], select, textarea {
+input[type="text"], input[type="date"], input[type="number"], input[type="search"], select, textarea {
   font: inherit;
   color: inherit;
   background: var(--surface);
@@ -360,6 +360,29 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, .btn:focus-vi
   outline-offset: 2px;
 }
 textarea { resize: vertical; }
+input[type="search"] { -webkit-appearance: none; appearance: none; border-radius: 999px; }
+
+/*
+ * Mobile Safari zooms the viewport whenever a focused control's text is under
+ * 16px, and never zooms back out. Every control that can take focus therefore
+ * holds at 16px on touch and narrow screens - the layout keeps its own scale,
+ * only the field text is pinned. Raising it here rather than turning zooming
+ * off in the viewport tag keeps pinch to zoom available.
+ */
+@media (pointer: coarse), (max-width: 900px) {
+  input[type="text"],
+  input[type="date"],
+  input[type="number"],
+  input[type="search"],
+  select,
+  textarea,
+  .score-input,
+  .player-input,
+  .players__edit,
+  .search {
+    font-size: 16px;
+  }
+}
 
 .segmented {
   display: flex;
@@ -453,6 +476,13 @@ textarea { resize: vertical; }
 .tuck[open] > summary { margin-bottom: 0.35rem; }
 
 /* ---------------------------------------------------------------- Matches */
+
+.searchbar { margin-bottom: 0.4rem; }
+.search {
+  width: 100%;
+  padding: 0.4rem 0.8rem;
+}
+.search::-webkit-search-cancel-button { cursor: pointer; }
 
 .toolbar {
   display: flex;
