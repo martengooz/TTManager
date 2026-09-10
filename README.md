@@ -24,11 +24,14 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
 - Enter set scores in a dialog that checks them against the real rules: a set ends at 11
   (or 21) with a two point margin, or by exactly two after deuce, and a match stops as soon
   as someone has enough sets. Illegal or incomplete scores are explained, not silently saved.
-- Type as little as the score allows. A losing score settles the set on its own, so entering
-  `5` fills in `11` opposite it and moves to the next set; `10` fills in `12`. Only a score of
-  11 or more is genuinely ambiguous — 12 could be 12-10 or 14-12 — so those wait for you to
-  type the other side. Sets after the one that decided the match grey out, and once the result
-  is complete the focus lands on *Save result*, so a four set match is a handful of keystrokes.
+- Type as little as the score allows. A losing score settles the set on its own, so typing `5`
+  fills in `11` opposite it and `10` fills in `12`. Only a score of the target or above is
+  genuinely ambiguous — 12 could be 12-10 or 14-12 — so those wait for you to type the other side.
+- Enter is what moves on, never the typing itself: a digit can always be the start of a longer
+  number. Enter on a settled set goes to the next set, on a half-typed one goes to the score
+  still missing, and on a score that could not have happened — 22-2, say — stays where it is so
+  you can correct it. Sets after the one that decided the match grey out, and once the result is
+  complete Enter lands on *Save result*.
 - Walkovers, editing and clearing a result are all one click.
 - Tap anywhere on a match card to open it. The count in the header is a button too — it shows
   what is still to play.
