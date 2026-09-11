@@ -55,8 +55,8 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
   of match number, at error correction level Q — and four corner marks, so a stack of filled-in
   cards can be photographed and read back by machine. The same identity prints as `T3·M12` for
   people.
-- Print the matches that can start now, everything still to play, or all of them, one or two cards
-  to a page, cut along the dashed rule. The umpire fills it in at the table and hands it back, and
+- Print the matches that can start now, everything still to play, or all of them. One match to a
+  sheet, since a card goes to an umpire at a table. The umpire fills it in and hands it back, and
   the organiser types the result in from the card.
 
 **Print it**

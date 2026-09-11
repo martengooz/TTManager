@@ -240,7 +240,6 @@ const SV = {
   "Ready to play": "Kan spelas nu",
   "Still to play": "Kvar att spela",
   "Player {n}": "Spelare {n}",
-  "Cards per page": "Protokoll per sida",
   "Table": "Bord",
   "Match {n}": "Match {n}",
   "Set": "Set",

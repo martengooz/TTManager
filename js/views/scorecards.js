@@ -8,9 +8,10 @@ import { t } from "../i18n.js";
 import { rerenderView } from "../app.js";
 import { svg as qrSvg } from "../qr.js";
 
+/* One match to a sheet: a card is handed to an umpire at a table, so two
+   matches on one page would have to be cut apart before they were useful. */
 const options = {
   scope: "ready", // ready = both players known and no result yet
-  perPage: 2,
 };
 
 const SCOPES = [
@@ -18,8 +19,6 @@ const SCOPES = [
   { id: "todo", label: "Still to play" },
   { id: "all", label: "All matches" },
 ];
-
-const PER_PAGE = [1, 2];
 
 /* Draw order is also the order the matches are numbered in, so the cards come
    off the printer in the order the organiser sees them on screen. */
@@ -151,18 +150,6 @@ export function render(tour) {
           </button>`
         )}
       </span>
-      <span class="printbar__group">
-        <span class="printbar__label">${t("Cards per page")}</span>
-        ${PER_PAGE.map(
-          (n) => html`<button
-            class="chip${raw(options.perPage === n ? " is-active" : "")}"
-            data-action="card-per-page"
-            data-value="${n}"
-          >
-            ${n}
-          </button>`
-        )}
-      </span>
     </div>
     <button class="btn btn--primary" data-action="do-print" ${raw(matches.length ? "" : "disabled")}>
       ${t("Print / Save as PDF")}
@@ -185,7 +172,7 @@ export function render(tour) {
   }
 
   return html`${raw(controls)}
-    <div class="scards" data-per-page="${options.perPage}">
+    <div class="scards">
       ${matches.map((match) => raw(card(tour, match)))}
     </div>`;
 }
@@ -193,10 +180,6 @@ export function render(tour) {
 export function handle(action, target) {
   if (action === "card-scope") {
     options.scope = target.dataset.value;
-    rerenderView();
-  }
-  if (action === "card-per-page") {
-    options.perPage = Number(target.dataset.value);
     rerenderView();
   }
   if (action === "do-print") window.print();

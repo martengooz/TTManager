@@ -869,7 +869,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
 /* ---------------------------------------------------------------- Scorecards */
 
 .printbar__group { display: inline-flex; align-items: center; gap: 0.3rem; }
-.printbar__label { font-size: 0.78rem; color: var(--muted); margin-right: 0.15rem; }
+.printbar__label { font-size: 0.78rem; color: var(--muted); margin-right: 0.15rem; white-space: nowrap; }
 
 .scards { display: grid; gap: 0.8rem; max-width: 900px; margin: 0 auto 3rem; }
 
@@ -954,36 +954,20 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
 
 @media print {
   .scards { gap: 0; max-width: none; margin: 0; }
-  .scard { border-radius: 0; margin: 0; }
 
-  /* Full page: bigger everything, and the footer pinned to the bottom. */
-  .scards[data-per-page="1"] .scard { min-height: 240mm; padding: 10mm 12mm; gap: 6mm; }
-  .scards[data-per-page="1"] .scard__event b { font-size: 16pt; }
-  .scards[data-per-page="1"] .scard__name { font-size: 19pt; }
-  .scards[data-per-page="1"] .scard__box { height: 15mm; }
-  .scards[data-per-page="1"] .scard__foot { margin-top: auto; }
-
-  /* Two to a sheet, cut along the dashed rule. Everything tightens; the code
-     stays as large as the height allows, since reading it is the point. */
-  .scards[data-per-page="2"] .scard { min-height: 0; height: 130mm; padding: 5mm 7mm; gap: 1.5mm; overflow: hidden; }
-  .scards[data-per-page="2"] .scard__event b { font-size: 11pt; }
-  .scards[data-per-page="2"] .scard__event span { font-size: 8pt; }
-  .scards[data-per-page="2"] .scard__meta { font-size: 8.5pt !important; }
-  .scards[data-per-page="2"] .scard__ident svg { width: 19mm; height: 19mm; }
-  .scards[data-per-page="2"] .scard__code { font-size: 7pt; }
-  .scards[data-per-page="2"] .scard__players { padding: 1.5mm 3mm; }
-  .scards[data-per-page="2"] .scard__name { font-size: 11.5pt; }
-  .scards[data-per-page="2"] .scard__club { font-size: 8pt; }
-  .scards[data-per-page="2"] .scard__box { height: 6mm; width: 26mm; }
-  .scards[data-per-page="2"] .scard__setcol { width: 20mm; font-size: 9pt; }
-  .scards[data-per-page="2"] .scard__sets thead th { font-size: 8pt; padding: 0.5mm 0; }
-  .scards[data-per-page="2"] .scard__sign { gap: 2mm 5mm; }
-  .scards[data-per-page="2"] .scard__write { min-height: 5mm; }
-  .scards[data-per-page="2"] .scard__tick { width: 3.5mm; height: 3.5mm; }
-  .scards[data-per-page="2"] .scard__foot { display: none; }
-  .scards[data-per-page="2"] .scard__anchor { width: 3mm; height: 3mm; }
-  .scards[data-per-page="1"] .scard { break-after: page; }
-  .scards[data-per-page="2"] .scard:nth-child(2n) { break-after: page; }
-  .scards[data-per-page="2"] .scard:nth-child(odd) { border-bottom-style: dashed; }
+  /* One card fills its own sheet: bigger type, roomier boxes, footer pinned
+     to the bottom, and a page break after every card. */
+  .scard {
+    border-radius: 0;
+    margin: 0;
+    min-height: 240mm;
+    padding: 10mm 12mm;
+    gap: 6mm;
+    break-after: page;
+  }
+  .scard__event b { font-size: 16pt; }
+  .scard__name { font-size: 19pt; }
+  .scard__box { height: 15mm; }
+  .scard__foot { margin-top: auto; }
   .scards .scard:last-child { break-after: auto; }
 }
