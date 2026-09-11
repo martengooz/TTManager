@@ -524,6 +524,21 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
   letter-spacing: 0.03em;
 }
 .match__stage { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match__print {
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  padding: 0 0 0 0.35rem;
+  margin: -0.3rem -0.2rem -0.3rem 0;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 0;
+}
+.match__print:hover { color: var(--accent); }
+.match__print svg { display: block; }
+.printbar__one { flex: 1; font-size: 0.9rem; font-weight: 550; }
+
 .match__cta {
   margin-left: auto;
   text-transform: none;
@@ -532,7 +547,22 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
   color: var(--muted);
   white-space: nowrap;
 }
-.match:hover .match__cta { color: var(--accent); }
+.match:hover .match__print {
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  padding: 0 0 0 0.35rem;
+  margin: -0.3rem -0.2rem -0.3rem 0;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 0;
+}
+.match__print:hover { color: var(--accent); }
+.match__print svg { display: block; }
+.printbar__one { flex: 1; font-size: 0.9rem; font-weight: 550; }
+
+.match__cta { color: var(--accent); }
 
 .match__no { font-weight: 700; color: var(--accent); }
 .match__players { display: grid; gap: 0.15rem; }
@@ -953,7 +983,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
 .scard__foot { margin: 0; font-size: 7.5pt; color: #666; text-align: center; }
 
 @media print {
-  .scards { gap: 0; max-width: none; margin: 0; }
+  .scards { gap: 0; max-width: none; margin: 0; zoom: 1 !important; }
 
   /* One card fills its own sheet: bigger type, roomier boxes, footer pinned
      to the bottom, and a page break after every card. */

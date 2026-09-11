@@ -17,7 +17,7 @@ const VIEWS = { setup, matches, standings, bracket, print: printView, scorecards
 const TABS = ["setup", "matches", "standings", "bracket", "print"];
 const TAB_LABELS = { setup: "Setup", matches: "Matches", standings: "Standings", bracket: "Bracket", print: "Print" };
 
-export const state = { tournament: null, view: "home", filter: "all", groupFilter: "all", search: "" };
+export const state = { tournament: null, view: "home", arg: null, filter: "all", groupFilter: "all", search: "" };
 
 export function save() {
   if (state.tournament) store.save(state.tournament);
@@ -38,8 +38,8 @@ export function toast(message, kind = "info") {
 
 function parseHash() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  if (parts[0] === "t" && parts[1]) return { id: parts[1], view: parts[2] || "setup" };
-  return { id: null, view: "home" };
+  if (parts[0] === "t" && parts[1]) return { id: parts[1], view: parts[2] || "setup", arg: parts[3] || null };
+  return { id: null, view: "home", arg: null };
 }
 
 function chrome(tournament, view) {
@@ -90,7 +90,7 @@ export function render() {
   const route = parseHash();
   const app = $("#app");
   const scrollY = window.scrollY;
-  const screen = `${route.id || "home"}/${route.id ? route.view : ""}`;
+  const screen = `${route.id || "home"}/${route.id ? route.view : ""}/${route.arg || ""}`;
   const sameScreen = screen === lastScreen;
   lastScreen = screen;
 
@@ -112,6 +112,7 @@ export function render() {
   }
   state.tournament = tournament;
   state.view = VIEWS[route.view] ? route.view : "setup";
+  state.arg = route.arg;
 
   const view = VIEWS[state.view];
   const bare = state.view === "print" || state.view === "scorecards";
