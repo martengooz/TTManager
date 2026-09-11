@@ -46,11 +46,18 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
 
 **Scorecards for the umpires**
 - *Umpire scorecards* in the ⋯ menu prints a blank card per match: the tournament, the match
-  number and stage, both names and clubs, a box for the table it is played on, a grid of set
-  scores, and signature lines for the winner and the umpire.
-- Print the matches that can start now, everything still to play, or all of them — one, two or
-  four cards to a page, cut along the dashed rule. The umpire fills it in at the table and hands
-  it back, and the organiser types the result in from the card.
+  number and stage, both names and clubs, a box for the table it is played on, boxes for the set
+  scores, and lines for the winner and the umpire to sign.
+- The sets run down the middle of the card, seven of them whatever the match length, with each
+  player's boxes on their own side of the set number. Players are keyed **A** and **B** beside
+  their names and the columns carry the same letters, so a long name never shrinks to fit a header.
+- Every card carries a QR code of the match it belongs to — one byte of tournament number and two
+  of match number, at error correction level Q — and four corner marks, so a stack of filled-in
+  cards can be photographed and read back by machine. The same identity prints as `T3·M12` for
+  people.
+- Print the matches that can start now, everything still to play, or all of them, one or two cards
+  to a page, cut along the dashed rule. The umpire fills it in at the table and hands it back, and
+  the organiser types the result in from the card.
 
 **Print it**
 - The print screen composes the whole tournament into one document: header, player list,
@@ -111,6 +118,7 @@ manifest.webmanifest    PWA metadata
 version.js              the app version, read by the page and by the service worker
 sw.js                   offline cache, named after the version
 js/i18n.js              translations; keys are the English strings themselves
+js/qr.js                QR encoder for the scorecard codes, level Q
 js/settings.js          language, view density and score entry preferences
 js/model.js             draw, schedule, scoring rules, standings, bracket
 js/store.js             local storage, export and import

@@ -56,6 +56,22 @@ shadows the translator. And never store translated text in tournament data: grou
 `letter` and knockout rounds their round index, and `groupName()` / `matchLabel()` turn those
 into words at render time, so switching language re-labels saved tournaments too.
 
+## The scorecard code
+
+`js/qr.js` is a QR encoder written for this app: byte mode, error correction level Q, versions
+1 to 10. A scorecard encodes three bytes — one of tournament number, two of match number — which
+keeps the symbol at version 1, so its modules stay large enough to survive a phone photo.
+
+Those numbers are why tournaments and matches carry a sequential `no` alongside their id:
+`store.save` hands out tournament numbers 1-255 from a counter, and `model.numberMatches` numbers
+the playable matches in draw order. The match number is also what the app shows as `#12`, so the
+two can never disagree.
+
+If the encoder is ever changed, verify it by encoding, rendering and decoding with an independent
+decoder. Comparing modules against another encoder is not enough on its own: a reference encoder
+may quietly raise the error correction level when there is room in the symbol, which makes a
+correct symbol look wrong.
+
 ## Two printed things, for different readers
 
 `print.js` is the tournament record: results, tables, bracket, placings — read after the fact.

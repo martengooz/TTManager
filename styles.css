@@ -873,152 +873,117 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
 
 .scards { display: grid; gap: 0.8rem; max-width: 900px; margin: 0 auto 3rem; }
 
-/* A form to be written on by hand: ink-light, generous rules, no fills. */
+/* A form to be written on and then photographed: black on white, closed boxes,
+   no fills behind anything handwritten. */
 .scard {
+  position: relative;
   background: #fff;
   border: 1px solid #111;
   border-radius: 4px;
-  padding: 4mm 5mm;
+  padding: 6mm 7mm;
   color: #111;
   display: flex;
   flex-direction: column;
-  gap: 2.5mm;
+  gap: 3mm;
   break-inside: avoid;
 }
-.scard__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 4mm; }
-.scard__event { display: grid; gap: 0.5mm; font-size: 10pt; line-height: 1.25; }
-.scard__event b { font-size: 12pt; }
+
+/* Corner marks, so software can square up a photo taken at an angle. */
+.scard__anchor { position: absolute; width: 4mm; height: 4mm; background: #111; }
+.scard__anchor--tl { top: 1.5mm; left: 1.5mm; }
+.scard__anchor--tr { top: 1.5mm; right: 1.5mm; }
+.scard__anchor--bl { bottom: 1.5mm; left: 1.5mm; }
+.scard__anchor--br { bottom: 1.5mm; right: 1.5mm; }
+
+.scard__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 5mm; padding: 0 5mm; }
+.scard__event { display: grid; gap: 0.5mm; font-size: 10pt; line-height: 1.3; min-width: 0; }
+.scard__event b { font-size: 13pt; }
 .scard__event span { color: #444; font-size: 9pt; }
-.scard__table { display: flex; align-items: baseline; gap: 2mm; font-size: 9.5pt; white-space: nowrap; }
-.scard__table .scard__write { width: 22mm; }
-.scard__meta { margin: 0; font-size: 9pt; color: #444; }
+.scard__meta { font-size: 9.5pt !important; color: #111 !important; }
+.scard__ident { display: grid; justify-items: center; gap: 0.5mm; flex: none; }
+.scard__ident svg { display: block; }
+.scard__code { font-family: var(--mono); font-size: 8pt; letter-spacing: 0.04em; color: #333; }
+.scard__table { display: flex; align-items: baseline; gap: 2mm; font-size: 10pt; white-space: nowrap; flex: none; }
+.scard__table .scard__write { width: 26mm; }
 
 .scard__players {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 3mm;
+  display: flex;
+  justify-content: space-between;
+  gap: 6mm;
   border-top: 1px solid #111;
   border-bottom: 1px solid #111;
-  padding: 2mm 0;
+  padding: 2.5mm 5mm;
 }
-.scard__player { display: grid; gap: 0.5mm; min-width: 0; }
-.scard__player:last-child { text-align: right; }
-.scard__name { font-size: 13pt; font-weight: 650; line-height: 1.15; }
-/* An unknown player leaves a rule to write the name on. */
-.scard__name--blank { color: #666; font-weight: 500; border-bottom: 1px solid #999; min-height: 1.2em; }
-.scard__club { font-size: 8.5pt; color: #555; }
-.scard__v { font-size: 9pt; color: #666; }
-
-.scard__sets { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.scard__sets th, .scard__sets td { border: 1px solid #111; padding: 1mm 1.5mm; text-align: center; }
-.scard__sets thead th { font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
-.scard__sets th[scope="row"] {
-  text-align: left;
-  font-size: 9.5pt;
-  font-weight: 550;
-  width: 34%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.scard__box { height: 8mm; }
-.scard__box--total { background: #f2f2f2; }
-
-/* Sets listed down the page: a set per row, a player per column. */
-.scard__sets--rows { table-layout: auto; }
-.scard__sets--rows th[scope="col"] {
-  font-size: 10pt;
-  text-transform: none;
-  letter-spacing: 0;
-  white-space: normal;
-}
-.scard__sets--rows th[scope="col"]:first-child { width: 20mm; }
-.scard__sets--rows th[scope="row"] {
-  width: 20mm;
-  text-align: center;
+/* The key sits against the name on both sides, mirrored on the right. */
+.scard__player { display: grid; grid-template-columns: auto 1fr; gap: 0 2mm; min-width: 0; align-items: start; }
+.scard__player .scard__name { grid-area: 1 / 2; }
+.scard__player .scard__club { grid-area: 2 / 2; }
+.scard__player:last-child { text-align: right; grid-template-columns: 1fr auto; }
+.scard__player:last-child .scard__key { grid-area: 1 / 2; }
+.scard__player:last-child .scard__name { grid-area: 1 / 1; }
+.scard__player:last-child .scard__club { grid-area: 2 / 1; }
+.scard__key {
+  align-self: start;
+  border: 1.2px solid #111;
+  border-radius: 2px;
+  padding: 0 1.4mm;
   font-size: 11pt;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.35;
 }
-.scard__won th[scope="row"] { font-size: 9.5pt; }
+.scard__name { font-size: 14pt; font-weight: 650; line-height: 1.2; overflow-wrap: anywhere; }
+.scard__name--blank { font-weight: 500; color: #555; }
+.scard__club { font-size: 9pt; color: #555; }
 
-.scard__sign { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 5mm; }
-.scard__sign label { display: flex; align-items: baseline; gap: 2mm; font-size: 9pt; color: #333; }
-.scard__write { flex: 1; border-bottom: 1px solid #111; min-height: 5mm; display: inline-block; }
+/* Sets down the page, A and B either side of the set number. */
+.scard__sets { border-collapse: collapse; align-self: center; table-layout: fixed; }
+.scard__sets th, .scard__sets td { border: 1px solid #111; text-align: center; padding: 0; }
+.scard__sets thead th { font-size: 9pt; font-weight: 700; padding: 1mm 0; }
+.scard__setcol { border: 0 !important; font-size: 10pt; font-weight: 600; width: 24mm; }
+.scard__box { width: 30mm; height: 11mm; }
+.scard__box--total { background: #f2f2f2; }
+.scard__won .scard__setcol { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.03em; }
+
+.scard__sign { display: grid; grid-template-columns: auto 1fr 1fr; gap: 3mm 6mm; align-items: end; padding: 0 5mm; }
+.scard__sign label { display: grid; gap: 1mm; font-size: 9pt; color: #333; }
+.scard__ticks { font-size: 10.5pt; color: #111; white-space: nowrap; }
+.scard__tick { display: inline-block; width: 4.5mm; height: 4.5mm; border: 1.2px solid #111; vertical-align: -1mm; margin-right: 1mm; }
+.scard__tick + * { margin-left: 2mm; }
+.scard__write { border-bottom: 1px solid #111; min-height: 8mm; display: block; }
 .scard__foot { margin: 0; font-size: 7.5pt; color: #666; text-align: center; }
 
 @media print {
   .scards { gap: 0; max-width: none; margin: 0; }
-  .scard {
-    border-radius: 0;
-    /* Room to write, and a size that divides the page evenly. */
-    padding: 5mm 6mm;
-    margin: 0;
-  }
-  /* Full page: the same card with room to write at arm's length. */
-  /* Comfortably inside the page rather than filling it to the last millimetre:
-     a card that overshoots by a hair spills onto a second sheet. */
-  .scards[data-per-page="1"] .scard { min-height: 230mm; padding: 8mm 10mm; gap: 4mm; }
-  .scards[data-per-page="1"] .scard__event b { font-size: 17pt; }
-  .scards[data-per-page="1"] .scard__event span,
-  .scards[data-per-page="1"] .scard__meta { font-size: 11pt; }
-  .scards[data-per-page="1"] .scard__table { font-size: 12pt; }
-  .scards[data-per-page="1"] .scard__table .scard__write { width: 40mm; }
-  .scards[data-per-page="1"] .scard__players { padding: 4mm 0; }
-  .scards[data-per-page="1"] .scard__name { font-size: 20pt; }
-  .scards[data-per-page="1"] .scard__club { font-size: 11pt; }
-  .scards[data-per-page="1"] .scard__sets th,
-  .scards[data-per-page="1"] .scard__sets td { font-size: 12pt; padding: 2mm; }
-  .scards[data-per-page="1"] .scard__sets thead th { font-size: 10pt; }
-  .scards[data-per-page="1"] .scard__sign { gap: 7mm 12mm; margin-top: 4mm; }
-  .scards[data-per-page="1"] .scard__sign label { font-size: 11pt; }
-  .scards[data-per-page="1"] .scard__foot { margin-top: auto; font-size: 10pt; }
-  .scards[data-per-page="2"] .scard { min-height: 128mm; }
-  /* Quarter page: the same fields, tightened until four fit on the sheet. */
-  .scards[data-per-page="4"] .scard {
-    height: 64mm;
-    min-height: 0;
-    padding: 3mm 4mm;
-    gap: 1mm;
-    overflow: hidden;
-  }
-  .scards[data-per-page="4"] .scard__event b { font-size: 10pt; }
-  .scards[data-per-page="4"] .scard__event span,
-  .scards[data-per-page="4"] .scard__meta { font-size: 7.5pt; }
-  .scards[data-per-page="4"] .scard__players { padding: 1mm 0; }
-  .scards[data-per-page="4"] .scard__name { font-size: 10.5pt; }
-  .scards[data-per-page="4"] .scard__sets th,
-  .scards[data-per-page="4"] .scard__sets td { padding: 0.5mm 1mm; }
-  .scards[data-per-page="4"] .scard__box { height: 5mm; }
-  .scards[data-per-page="4"] .scard__sign { grid-template-columns: repeat(4, 1fr); gap: 1mm 3mm; }
-  .scards[data-per-page="4"] .scard__sign label { font-size: 7.5pt; gap: 1mm; }
-  .scards[data-per-page="4"] .scard__club,
-  .scards[data-per-page="4"] .scard__foot { display: none; }
+  .scard { border-radius: 0; margin: 0; }
+
+  /* Full page: bigger everything, and the footer pinned to the bottom. */
+  .scards[data-per-page="1"] .scard { min-height: 240mm; padding: 10mm 12mm; gap: 6mm; }
+  .scards[data-per-page="1"] .scard__event b { font-size: 16pt; }
+  .scards[data-per-page="1"] .scard__name { font-size: 19pt; }
+  .scards[data-per-page="1"] .scard__box { height: 15mm; }
+  .scards[data-per-page="1"] .scard__foot { margin-top: auto; }
+
+  /* Two to a sheet, cut along the dashed rule. Everything tightens; the code
+     stays as large as the height allows, since reading it is the point. */
+  .scards[data-per-page="2"] .scard { min-height: 0; height: 130mm; padding: 5mm 7mm; gap: 1.5mm; overflow: hidden; }
+  .scards[data-per-page="2"] .scard__event b { font-size: 11pt; }
+  .scards[data-per-page="2"] .scard__event span { font-size: 8pt; }
+  .scards[data-per-page="2"] .scard__meta { font-size: 8.5pt !important; }
+  .scards[data-per-page="2"] .scard__ident svg { width: 19mm; height: 19mm; }
+  .scards[data-per-page="2"] .scard__code { font-size: 7pt; }
+  .scards[data-per-page="2"] .scard__players { padding: 1.5mm 3mm; }
+  .scards[data-per-page="2"] .scard__name { font-size: 11.5pt; }
+  .scards[data-per-page="2"] .scard__club { font-size: 8pt; }
+  .scards[data-per-page="2"] .scard__box { height: 6mm; width: 26mm; }
+  .scards[data-per-page="2"] .scard__setcol { width: 20mm; font-size: 9pt; }
+  .scards[data-per-page="2"] .scard__sets thead th { font-size: 8pt; padding: 0.5mm 0; }
+  .scards[data-per-page="2"] .scard__sign { gap: 2mm 5mm; }
+  .scards[data-per-page="2"] .scard__write { min-height: 5mm; }
+  .scards[data-per-page="2"] .scard__tick { width: 3.5mm; height: 3.5mm; }
+  .scards[data-per-page="2"] .scard__foot { display: none; }
+  .scards[data-per-page="2"] .scard__anchor { width: 3mm; height: 3mm; }
   .scards[data-per-page="1"] .scard { break-after: page; }
   .scards[data-per-page="2"] .scard:nth-child(2n) { break-after: page; }
-  .scards[data-per-page="4"] .scard:nth-child(4n) { break-after: page; }
+  .scards[data-per-page="2"] .scard:nth-child(odd) { border-bottom-style: dashed; }
   .scards .scard:last-child { break-after: auto; }
-  /* Cards are cut apart, so the rule between them is the cutting line. */
-  .scards[data-per-page="2"] .scard:nth-child(odd),
-  .scards[data-per-page="4"] .scard:not(:nth-child(4n)) { border-bottom-style: dashed; }
 }
-
-/* ---------------------------------------------------------------- Full page card */
-
-/* The score fields are written in by hand, so they stay roughly square and
-   only as wide as they need to be - the card is not a spreadsheet. */
-.scard--tall .scard__sets--rows {
-  width: auto;
-  table-layout: fixed;
-  /* The card is a column flexbox, which would otherwise stretch the table
-     across the full width and with it every score box. Centred, since it no
-     longer spans the card. */
-  align-self: center;
-}
-.scard--tall .scard__sets--rows th[scope="col"] { width: 26mm; font-size: 9.5pt; }
-.scard--tall .scard__sets--rows th[scope="col"]:first-child { width: 16mm; }
-.scard--tall .scard__sets--rows th[scope="row"] { width: 16mm; font-size: 11pt; }
-.scard--tall .scard__sets--rows .scard__box { height: 14mm; }
-.scard--tall .scard__sign label { flex-wrap: wrap; gap: 1mm 2mm; }
-.scard--tall .scard__write { min-height: 10mm; }
-.scard--tall .scard__sign .scard__write { flex-basis: 100%; }
