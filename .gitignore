@@ -1,0 +1,3 @@
+# The MNIST files tools/train-digits.py trains on. Eleven megabytes of data
+# that never ships: the script's header says where to fetch them.
+tools/mnist/

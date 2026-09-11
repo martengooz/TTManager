@@ -294,6 +294,46 @@ const SV = {
     "Installerad — leta efter TT Manager på hemskärmen",
   "{n} players · {format}": "{n} spelare · {format}",
   "Tournament {date}": "Turnering {date}",
+
+  /* Reading a filled-in scorecard with the camera. */
+  "Scan a scorecard": "Skanna ett protokoll",
+  "Point the camera at a filled-in umpire card. The code on the sheet says which match it is, and the scores are read from the boxes.":
+    "Rikta kameran mot ett ifyllt domarprotokoll. Koden på bladet talar om vilken match det gäller, och siffrorna läses ur rutorna.",
+  "Reading a card needs an image library of about {mb} MB. It downloads once and then works offline.":
+    "För att läsa ett protokoll behövs ett bildbibliotek på ungefär {mb} MB. Det hämtas en gång och fungerar sedan utan uppkoppling.",
+  "Start the camera": "Starta kameran",
+  "Choose a photo": "Välj ett foto",
+  "Getting the reader ready": "Förbereder läsaren",
+  "This happens once. Afterwards it works with no connection.":
+    "Det här sker en gång. Sedan fungerar det utan uppkoppling.",
+  "Hold the whole card in the frame.": "Håll hela protokollet inom ramen.",
+  "Read this card": "Läs det här protokollet",
+  "Stop": "Stoppa",
+  "Scan another": "Skanna ett till",
+  "No card in view. Get all four corner marks in the frame.":
+    "Inget protokoll syns. Få med alla fyra hörnmärken i bilden.",
+  "The score table was not clear enough to read. Try again with more light.":
+    "Sifferrutorna gick inte att läsa. Försök igen med mer ljus.",
+  "The code on the card could not be read. Move a little closer.":
+    "Koden på protokollet gick inte att läsa. Gå lite närmare.",
+  "That card belongs to a different tournament.": "Det protokollet hör till en annan turnering.",
+  "Nothing is written on that card yet.": "Det står ingenting på protokollet än.",
+  "The scores on that card do not add up to a finished match.":
+    "Siffrorna på protokollet blir ingen färdigspelad match.",
+  "That card is from tournament {n}, match {m}.": "Protokollet är från turnering {n}, match {m}.",
+  "That photo could not be read.": "Fotot gick inte att läsa.",
+  "That photo could not be opened.": "Fotot gick inte att öppna.",
+  "The camera could not be opened. You can still choose a photo instead.":
+    "Kameran gick inte att öppna. Du kan välja ett foto i stället.",
+  "The image library could not be loaded. Check the connection and try again.":
+    "Bildbiblioteket gick inte att hämta. Kontrollera uppkopplingen och försök igen.",
+  "The sets won at the foot of the card do not match these scores. Check before saving.":
+    "Antalet vunna set längst ner på protokollet stämmer inte med siffrorna. Kontrollera innan du sparar.",
+  "The marked rows were not clear. Check them against the card.":
+    "De markerade raderna var otydliga. Stäm av dem mot protokollet.",
+  "This match already has a result. Saving replaces it.":
+    "Matchen har redan ett resultat. Sparar du ersätts det.",
+  "check": "kolla",
 };
 
 const DICTIONARIES = { en: {}, sv: SV };
