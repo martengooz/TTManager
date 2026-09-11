@@ -44,8 +44,15 @@ function club(tour, match, side) {
   return player ? player.club : "";
 }
 
+/* A full page card lists the sets down the page, with room to write, and always
+   offers at least seven of them. The smaller sizes keep the compact grid. */
+const TALL_SET_ROWS = 7;
+
 function card(tour, match, number) {
-  const sets = Array.from({ length: tour.settings.bestOf }, (_, i) => i + 1);
+  const tall = options.perPage === 1;
+  const setCount = tall ? Math.max(tour.settings.bestOf, TALL_SET_ROWS) : tour.settings.bestOf;
+  const sets = Array.from({ length: setCount }, (_, i) => i + 1);
+  const label = (side) => ((side === 1 ? match.p1 : match.p2) ? sideName(tour, match, side) : t("Player {n}", { n: side }));
   const nameCell = (side) => {
     const name = sideName(tour, match, side);
     const known = !!(side === 1 ? match.p1 : match.p2);
@@ -54,13 +61,46 @@ function card(tour, match, number) {
       <span class="scard__club">${esc(club(tour, match, side))}</span>
     </div>`;
   };
-  const row = (side) => `<tr>
-    <th scope="row">${esc((side === 1 ? match.p1 : match.p2) ? sideName(tour, match, side) : t("Player {n}", { n: side }))}</th>
+  // Sets across the page: a column per set, a row per player.
+  const wideRow = (side) => `<tr>
+    <th scope="row">${esc(label(side))}</th>
     ${sets.map(() => '<td class="scard__box"></td>').join("")}
     <td class="scard__box scard__box--total"></td>
   </tr>`;
 
-  return html`<article class="scard">
+  const wideTable = `<table class="scard__sets">
+    <thead>
+      <tr>
+        <th scope="col">${esc(t("Set"))}</th>
+        ${sets.map((n) => `<th scope="col">${n}</th>`).join("")}
+        <th scope="col">${esc(t("Sets won"))}</th>
+      </tr>
+    </thead>
+    <tbody>${wideRow(1)}${wideRow(2)}</tbody>
+  </table>`;
+
+  // Sets down the page: a row per set, a column per player.
+  const tallTable = `<table class="scard__sets scard__sets--rows">
+    <thead>
+      <tr>
+        <th scope="col">${esc(t("Set"))}</th>
+        <th scope="col">${esc(label(1))}</th>
+        <th scope="col">${esc(label(2))}</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${sets
+        .map((n) => `<tr><th scope="row">${n}</th><td class="scard__box"></td><td class="scard__box"></td></tr>`)
+        .join("")}
+      <tr class="scard__won">
+        <th scope="row">${esc(t("Sets won"))}</th>
+        <td class="scard__box scard__box--total"></td>
+        <td class="scard__box scard__box--total"></td>
+      </tr>
+    </tbody>
+  </table>`;
+
+  return html`<article class="scard${raw(tall ? " scard--tall" : "")}">
     <header class="scard__head">
       <div class="scard__event">
         <b>${tour.name}</b>
@@ -83,19 +123,7 @@ function card(tour, match, number) {
       ${raw(nameCell(2))}
     </div>
 
-    <table class="scard__sets">
-      <thead>
-        <tr>
-          <th scope="col">${t("Set")}</th>
-          ${sets.map((n) => `<th scope="col">${n}</th>`)}
-          <th scope="col">${t("Sets won")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${raw(row(1))}
-        ${raw(row(2))}
-      </tbody>
-    </table>
+    ${raw(tall ? tallTable : wideTable)}
 
     <div class="scard__sign">
       <label><span>${t("Winner")}</span><span class="scard__write"></span></label>
