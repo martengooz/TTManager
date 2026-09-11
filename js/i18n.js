@@ -234,6 +234,28 @@ const SV = {
   "Best of {n} to {points}": "Bäst av {n} till {points}",
   "Printed {when}": "Utskrivet {when}",
 
+  // Umpire scorecards
+  "Umpire scorecards": "Matchprotokoll",
+  "Matches to print": "Matcher att skriva ut",
+  "Ready to play": "Kan spelas nu",
+  "Still to play": "Kvar att spela",
+  "Player {n}": "Spelare {n}",
+  "Cards per page": "Protokoll per sida",
+  "Table": "Bord",
+  "Match {n}": "Match {n}",
+  "Set": "Set",
+  "Sets won": "Vunna set",
+  "Winner": "Vinnare",
+  "Winner's signature": "Vinnarens namnteckning",
+  "Umpire": "Domare",
+  "Umpire's signature": "Domarens namnteckning",
+  "Hand this to the organiser after the match.": "Lämna det här till tävlingsledningen efter matchen.",
+  "Nothing to print": "Inget att skriva ut",
+  "No match fits that choice — every one either has a result or is waiting on an earlier round.":
+    "Ingen match passar det valet — alla har antingen ett resultat eller väntar på en tidigare omgång.",
+  "Draw the tournament first and the scorecards appear here.":
+    "Lotta turneringen först, så dyker protokollen upp här.",
+
   // Settings dialog
   "Language": "Språk",
   "Automatic": "Automatiskt",

@@ -44,6 +44,14 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
 - A results grid per group, a bracket you can score straight from, and the final placings
   including the third place match.
 
+**Scorecards for the umpires**
+- *Umpire scorecards* in the ⋯ menu prints a blank card per match: the tournament, the match
+  number and stage, both names and clubs, a box for the table it is played on, a grid of set
+  scores, and signature lines for the winner and the umpire.
+- Print the matches that can start now, everything still to play, or all of them — one, two or
+  four cards to a page, cut along the dashed rule. The umpire fills it in at the table and hands
+  it back, and the organiser types the result in from the card.
+
 **Print it**
 - The print screen composes the whole tournament into one document: header, player list,
   every group table, results grid and match score, the knockout results, the bracket and the
@@ -108,7 +116,7 @@ js/model.js             draw, schedule, scoring rules, standings, bracket
 js/store.js             local storage, export and import
 js/components.js        shared rendering: match cards, tables, bracket, podium
 js/app.js               router, shared state, score dialog
-js/views/               one module per screen
+js/views/               one module per screen, including the umpire scorecards
 ```
 
 The model has no DOM dependencies, so the tournament logic can be exercised straight from

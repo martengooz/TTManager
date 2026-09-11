@@ -24,6 +24,7 @@ const ASSETS = [
   "js/views/standings.js",
   "js/views/bracket.js",
   "js/views/print.js",
+  "js/views/scorecards.js",
 ];
 
 self.addEventListener("install", (event) => {
