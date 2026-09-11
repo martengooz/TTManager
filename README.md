@@ -81,9 +81,11 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
   worked out this way are **shown in blue with what the card actually read beside them**,
   because they are the reader's reasoning rather than its reading — check those against the
   card before saving.
-- On a test set of sixty synthesised card photographs it read 58 exactly right and marked a
-  row on both of the ones it got wrong - but those are made-up photographs, so give the
-  scores a glance before you save.
+- Hold the card so it fills the frame if you can. It will read a whole A4 sheet from arm's
+  length, but the corner marks are what it finds the card by, and closer is easier.
+- On sixty synthesised photographs of a card filling the frame it reads 54 exactly right,
+  and on six of a whole sheet at arm's length, all six. Those are made-up photographs
+  though, so give the scores a glance before you save.
 - Reading happens on a background thread, so the viewfinder stays smooth and a tap always
   lands. The OpenCV build it uses is compiled for this app - only the parts that read a
   sheet of paper, with SIMD - which brings it from 10.3 MB down to 4.0 MB. It downloads the

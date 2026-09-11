@@ -922,8 +922,17 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
   break-inside: avoid;
 }
 
-/* Corner marks, so software can square up a photo taken at an angle. */
-.scard__anchor { position: absolute; width: 4mm; height: 4mm; background: #111; }
+/*
+ * Corner marks, so software can square up a photo taken at an angle.
+ *
+ * They were 4mm, which looked neater and did not work. Photographed as part of
+ * a whole A4 sheet held at arm's length, a 4mm mark is under twenty pixels
+ * across, and the two at the far corners of a sheet lit from one side come out
+ * grey on grey - so the reader found two corners and could do nothing with
+ * them. At 8mm they survive that, and a card is not a thing anyone looks at
+ * for its looks.
+ */
+.scard__anchor { position: absolute; width: 8mm; height: 8mm; background: #111; }
 .scard__anchor--tl { top: 1.5mm; left: 1.5mm; }
 .scard__anchor--tr { top: 1.5mm; right: 1.5mm; }
 .scard__anchor--bl { bottom: 1.5mm; left: 1.5mm; }

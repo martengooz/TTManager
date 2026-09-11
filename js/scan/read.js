@@ -14,8 +14,16 @@ import { readCard } from "./card.js";
 import { readBox } from "./digits.js";
 import { reconcile, totalsAgree } from "./reconcile.js";
 
-/** Below this a row is shown as needing a look before it is saved. */
-export const SURE_ENOUGH = 0.9;
+/*
+ * Below this a row is shown as needing a look before it is saved.
+ *
+ * Set high on purpose. The cost of marking a row that turned out to be right
+ * is a glance; the cost of not marking one that turned out to be wrong is a
+ * wrong result saved in a tournament, which nobody finds until the standings
+ * look odd. Tuning this down to reduce the marks would be optimising the wrong
+ * thing.
+ */
+export const SURE_ENOUGH = 0.98;
 
 /**
  * @param cv          the loaded OpenCV namespace

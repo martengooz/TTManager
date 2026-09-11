@@ -119,13 +119,33 @@ of every distribution comes from it.
 **It is never certain, so it never saves silently.** Every row comes back with a
 confidence; rows below `SURE_ENOUGH` are marked, and rows the rules had to
 reconstruct are marked differently and say what the card appeared to read,
-because those are two different claims. Over sixty synthesised photographs -
-real handwritten digits composited into a rendered card, then put through
-perspective, shadow, blur, noise and JPEG - 58 read exactly right and both
-misreadings came back with a row marked. Keep that last property: a wrong score
-saved without anyone noticing is worse than a reader that admits it is stuck.
-Synthesised cards are not photographs of real ones, so treat the figure as a
-regression baseline rather than a promise.
+because those are two different claims. Keep that property: a wrong score saved
+without anyone noticing is worse than a reader that admits it is stuck.
+
+The regression baselines are sixty synthesised photographs of a card filling
+the frame, and six of a whole A4 sheet held at arm's length, which is how a
+printed protocol actually reaches a camera. Both use real handwritten digits
+composited into a rendered card and put through perspective, shadow, blur,
+noise and JPEG. They currently read 54/60 and 6/6. Treat those as a baseline to
+not regress rather than as a promise: synthesised cards are not photographs of
+real ones, and the first six real photographs taken of a printed card found
+three separate failures that sixty synthetic ones had not.
+
+**Finding the card is the hard part, not reading it.** Every real-world failure
+so far has been the reader not finding the card, or squaring up the wrong
+rectangle; once a card is square and in focus the digits and the rules take
+care of themselves. Three things came out of the first photographs of a real
+printed card:
+
+- The corner marks had to grow from 4mm to 8mm. At 4mm on a whole sheet held at
+  arm's length they are under twenty pixels, and the two at the far corners of
+  a sheet lit from one side come out grey on grey.
+- A local threshold's window has to be comfortably larger than the mark it is
+  looking for, or the middle of the mark reads as paper and what is found is a
+  hollow ring - hence `ANCHOR_WINDOW_MM`.
+- Four marks at the corners of a rectangle look identical upside down, and no
+  geometry distinguishes them. The QR code does, because it only decodes one
+  way up.
 
 `vendor/` holds an OpenCV built for this app rather than the one OpenCV ships -
 see `tools/README.md` for what is in it and how to rebuild it. It is 4.0 MB
