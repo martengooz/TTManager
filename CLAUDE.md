@@ -33,7 +33,7 @@ shows in the start screen footer, so you can check what a phone is actually runn
 | `js/store.js` | local storage, export and import |
 | `js/components.js` | shared rendering: match cards, tables, bracket, podium |
 | `js/app.js` | router, shared state, score dialog |
-| `js/views/` | one module per screen |
+| `js/views/` | one module per screen; `print.js` and `scorecards.js` render without app chrome |
 | `sw.js` | offline cache |
 
 ## Built for one-handed use at the table
@@ -55,6 +55,14 @@ Two traps. Views take the tournament as a parameter, so never name that paramete
 shadows the translator. And never store translated text in tournament data: groups keep a
 `letter` and knockout rounds their round index, and `groupName()` / `matchLabel()` turn those
 into words at render time, so switching language re-labels saved tournaments too.
+
+## Two printed things, for different readers
+
+`print.js` is the tournament record: results, tables, bracket, placings — read after the fact.
+`scorecards.js` is a blank form the umpire writes on at the table and hands back, so it is
+built for ink: black on white, ruled boxes, no fills, and sized by a cards-per-page setting
+that paginates with `break-after`. Neither renders the topbar, so both carry their own back
+link, and neither should gain screen-only ornament.
 
 ## Worth knowing
 

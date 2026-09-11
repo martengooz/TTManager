@@ -10,9 +10,10 @@ import * as matches from "./views/matches.js";
 import * as standings from "./views/standings.js";
 import * as bracket from "./views/bracket.js";
 import * as printView from "./views/print.js";
+import * as scorecards from "./views/scorecards.js";
 import { sideName } from "./components.js";
 
-const VIEWS = { setup, matches, standings, bracket, print: printView };
+const VIEWS = { setup, matches, standings, bracket, print: printView, scorecards };
 const TABS = ["setup", "matches", "standings", "bracket", "print"];
 const TAB_LABELS = { setup: "Setup", matches: "Matches", standings: "Standings", bracket: "Bracket", print: "Print" };
 
@@ -58,6 +59,7 @@ function chrome(tournament, view) {
           <summary class="iconbtn" title="${t("More")}" aria-label="${t("More actions")}">⋯</summary>
           <div class="menu__list">
             <a class="menu__item" href="#/t/${tournament.id}/print">${t("Print / Save as PDF")}</a>
+            <a class="menu__item" href="#/t/${tournament.id}/scorecards">${t("Umpire scorecards")}</a>
             <button type="button" class="menu__item" data-action="export">${t("Export as JSON")}</button>
             <button type="button" class="menu__item" data-action="duplicate-current">${t("Duplicate tournament")}</button>
             <button type="button" class="menu__item" data-action="settings">${t("Settings")}</button>
@@ -112,7 +114,8 @@ export function render() {
   state.view = VIEWS[route.view] ? route.view : "setup";
 
   const view = VIEWS[state.view];
-  app.innerHTML = state.view === "print"
+  const bare = state.view === "print" || state.view === "scorecards";
+  app.innerHTML = bare
     ? view.render(tournament)
     : chrome(tournament, state.view) + `<main class="view view--${state.view}">${view.render(tournament)}</main>`;
   document.body.dataset.view = state.view;
