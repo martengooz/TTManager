@@ -1,87 +1,60 @@
 /*
- * Loads OpenCV on demand.
+ * Where OpenCV lives, and whether this browser can run it.
  *
- * The build in vendor/ is ten megabytes, which is more than the rest of the app
- * by two orders of magnitude, so it is deliberately not in the service worker's
- * install list: an organiser who never scans a card never pays for it. The
- * first scan fetches it, the service worker keeps the copy, and every scan
- * after that works offline like the rest of the app.
+ * The build in vendor/ is not the one OpenCV ships. That one is ten megabytes
+ * and contains deep learning, video tracking, feature matching and photography
+ * - none of which reads a sheet of paper. This one is compiled from the same
+ * source with tools/opencv_js.config.py as its whitelist, which is core,
+ * imgproc and the QR detector and nothing else, and with SIMD turned on. It
+ * comes to 2.7 MB, of which the 2.6 MB of WebAssembly streams and compiles as
+ * it downloads instead of arriving base64'd inside the JavaScript.
  *
- * It is loaded with a plain script tag rather than fetched and run from a blob.
- * Fetching it first sounds better - it would give a progress bar - but it holds
- * the whole ten megabytes in the JavaScript heap while the browser is also
- * decoding and compiling it, and the renderer runs out of memory doing it. A
- * script tag streams it, and streaming is also what lets the service worker put
- * it in the cache without a second copy.
+ * It is still not in the service worker's install list: an organiser who never
+ * scans a card should not carry it. The first scan fetches it, the service
+ * worker keeps both files, and every scan after that works offline.
  *
- * The file name carries the version. Bumping it is what invalidates the cached
- * copy, the same trick version.js plays for the app itself.
+ * The file names carry the version. Bumping them is what invalidates the
+ * cached copies, the same trick version.js plays for the app itself.
  */
 
-export const OPENCV_URL = "vendor/opencv-4.9.0.js";
+export const OPENCV_URL = "vendor/opencv-4.9.0-simd.js";
+export const OPENCV_WASM_URL = "vendor/opencv-4.9.0-simd.wasm";
 
-/** Roughly what the file weighs, so the screen can warn before it starts. */
-export const OPENCV_MB = 10;
+/** Roughly what the pair weighs, so the screen can warn before it starts. */
+export const OPENCV_MB = 2.7;
 
-let pending = null;
-
-/**
- * Makes the loaded module safe to hand to a promise.
+/*
+ * Whether the browser can run the build at all.
  *
- * Emscripten gives its module object a `then` method, which makes it a
- * thenable: resolving a promise with it does not resolve the promise, it calls
- * that method and waits for whatever comes back. What comes back is the module
- * again, so the promise machinery assimilates it forever and the page stops
- * responding - no error, no crash, just a tab that stops. The method has done
- * its job by the time the runtime is up, so it goes.
+ * SIMD is what makes it worth compiling ourselves, and it is not universal:
+ * Safari only gained it in 16.4. Without this check the failure is the wasm
+ * refusing to instantiate, which surfaces as an unexplained error at the
+ * moment someone points a camera at a card. These bytes are a module whose
+ * body uses a v128 instruction and nothing else, so validating them asks the
+ * engine the question directly.
  */
-function detach(cv) {
-  if (typeof cv.then === "function") delete cv.then;
-  return cv;
-}
+const SIMD_MODULE = new Uint8Array([
+  0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0,
+  10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11,
+]);
 
-/** Resolves with the ready `cv` namespace. */
-export function loadOpenCv() {
-  if (window.cv && window.cv.Mat) return Promise.resolve(detach(window.cv));
-  if (pending) return pending;
-
-  pending = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = OPENCV_URL;
-    script.async = true;
-    script.onerror = () => reject(new Error("opencv failed to load"));
-    script.onload = () => {
-      const cv = window.cv;
-      if (!cv) {
-        reject(new Error("opencv did not register"));
-        return;
-      }
-      /* The script returns before the wasm module has finished starting. */
-      if (cv.Mat) {
-        resolve(detach(cv));
-        return;
-      }
-      const timer = setTimeout(() => reject(new Error("opencv did not start")), 120000);
-      cv.onRuntimeInitialized = () => {
-        clearTimeout(timer);
-        resolve(detach(cv));
-      };
-    };
-    document.head.appendChild(script);
-  });
-
-  pending.catch(() => {
-    pending = null;
-  });
-  return pending;
-}
-
-/** True once the file is in the cache, so the screen can say so up front. */
-export async function isOpenCvCached() {
-  if (window.cv && window.cv.Mat) return true;
-  if (!window.caches) return false;
+export function hasSimd() {
   try {
-    return Boolean(await caches.match(new URL(OPENCV_URL, location.href).href));
+    return WebAssembly.validate(SIMD_MODULE);
+  } catch {
+    return false;
+  }
+}
+
+/** True once both files are in the cache, so the screen can say so up front. */
+export async function isOpenCvCached() {
+  if (!globalThis.caches) return false;
+  try {
+    const here = globalThis.location ? globalThis.location.href : "";
+    const hits = await Promise.all(
+      [OPENCV_URL, OPENCV_WASM_URL].map((path) => caches.match(new URL(path, here).href))
+    );
+    return hits.every(Boolean);
   } catch {
     return false;
   }

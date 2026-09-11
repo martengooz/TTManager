@@ -6,19 +6,19 @@
  * viewfinder that keeps trying by itself, and the tap is only there for when
  * they would rather decide the moment.
  *
- * What comes back is never saved without being shown. The reader is good but
- * it is not certain, and a wrong score saved silently is worse than no reader
- * at all - so the sets it read are laid out as ordinary editable fields, the
- * ones it is unsure of are marked, and saving is a deliberate act.
+ * The reading itself happens in a worker, so the preview never stutters and a
+ * tap always lands. What comes back is never saved without being shown: the
+ * reader is good but it is not certain, and a wrong score saved silently is
+ * worse than no reader at all.
  */
 import * as model from "../model.js";
+import * as store from "../store.js";
 import { html, raw, esc } from "../util.js";
 import { t } from "../i18n.js";
-import { state, rerenderView, save, toast, navigate } from "../app.js";
+import { state, rerenderView, toast, navigate } from "../app.js";
 import { sideName } from "../components.js";
-import { loadOpenCv, isOpenCvCached, OPENCV_MB } from "../scan/opencv.js";
-import { readScorecard, SURE_ENOUGH } from "../scan/read.js";
-import * as store from "../store.js";
+import { isOpenCvCached, hasSimd, OPENCV_MB } from "../scan/opencv.js";
+import { warmUp, readFrame, shutDown } from "../scan/reader.js";
 
 /* Everything this screen remembers between redraws. The camera stream is kept
    out of the DOM on purpose: the app re-renders screens wholesale, so the
@@ -32,8 +32,10 @@ const view = {
   problem: "",
 };
 
-let cv = null;
+let started = false;
 let loop = null;
+let busy = false;
+let scratchCanvas = null;
 
 const WHY = {
   anchors: "No card in view. Get all four corner marks in the frame.",
@@ -43,6 +45,37 @@ const WHY = {
   blank: "Nothing is written on that card yet.",
   illegal: "The scores on that card do not add up to a finished match.",
 };
+
+/* ------------------------------------------------------------------ *
+ * What the worker needs to know about this instance's tournaments
+ * ------------------------------------------------------------------ */
+
+/**
+ * The card carries a tournament number and a match number and nothing else, so
+ * this is all the worker needs: which numbers exist, and what the rules are for
+ * each. Turning those back into players stays on this side.
+ */
+function tournamentTable() {
+  const table = {};
+  for (const tournament of store.list()) {
+    if (!tournament.no) continue;
+    table[tournament.no] = {
+      bestOf: tournament.settings.bestOf,
+      pointsPerSet: tournament.settings.pointsPerSet,
+      matches: tournament.matches.filter((match) => match.status !== "bye" && match.no).map((match) => match.no),
+    };
+  }
+  return table;
+}
+
+/** Puts the players back on a reading that only knows numbers. */
+function attach(reading) {
+  const tournament = store.list().find((one) => one.no === reading.tournamentNo);
+  if (!tournament) return null;
+  const match = tournament.matches.find((one) => one.no === reading.matchNo);
+  if (!match) return null;
+  return { ...reading, tournament, match };
+}
 
 /* ------------------------------------------------------------------ *
  * The camera
@@ -63,79 +96,96 @@ async function startCamera() {
   rerenderView();
 }
 
-/** Called by the router when this screen is being replaced. */
-export function leave() {
-  stopCamera();
-  view.stage = view.stage === "review" ? "review" : "start";
-}
-
-export function stopCamera() {
+function stopCamera() {
   if (loop) clearTimeout(loop);
   loop = null;
   if (view.stream) view.stream.getTracks().forEach((track) => track.stop());
   view.stream = null;
 }
 
-/** A frame from the preview, no bigger than the reader needs. */
-function frameFrom(video) {
-  const longest = Math.max(video.videoWidth, video.videoHeight);
-  if (!longest) return null;
-  const scale = Math.min(1, 1600 / longest);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(video.videoWidth * scale);
-  canvas.height = Math.round(video.videoHeight * scale);
-  canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-  return canvas;
+/** Called by the router when this screen is being replaced. */
+export function leave() {
+  stopCamera();
+  started = false;
+  shutDown();
+  if (view.stage !== "review") view.stage = "start";
 }
 
 /**
- * Tries one frame.
+ * The current frame as pixels, no bigger than the reader needs.
  *
- * The hint is written straight into the DOM rather than through a re-render.
- * Redrawing the screen would take the video element with it, and a viewfinder
- * that blinks once a second is unusable; nothing else on the screen changes
- * until a card is actually read, and then it goes through render like
- * everything else.
+ * One canvas, reused: a viewfinder running for a minute would otherwise leave
+ * sixty of them behind for the collector.
  */
-function attempt(tour, { fromTap = false } = {}) {
+function pixelsFrom(source, width, height) {
+  const longest = Math.max(width, height);
+  if (!longest) return null;
+  const scale = Math.min(1, 1600 / longest);
+  if (!scratchCanvas) scratchCanvas = document.createElement("canvas");
+  scratchCanvas.width = Math.round(width * scale);
+  scratchCanvas.height = Math.round(height * scale);
+  const context = scratchCanvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(source, 0, 0, scratchCanvas.width, scratchCanvas.height);
+  return context.getImageData(0, 0, scratchCanvas.width, scratchCanvas.height);
+}
+
+function hint(message) {
+  /* Written straight into the DOM rather than through a re-render: redrawing
+     the screen would take the video element with it, and a viewfinder that
+     blinks once a second is unusable. */
+  const line = document.querySelector(".scan__hint");
+  if (line) line.textContent = message;
+}
+
+function accept(reading) {
+  const full = attach(reading);
+  if (!full) {
+    hint(t(WHY.unknown));
+    return false;
+  }
+  view.reading = full;
+  view.sets = full.sets.map((set) => [...set]);
+  view.stage = "review";
+  stopCamera();
+  rerenderView();
+  return true;
+}
+
+/** Tries one frame. Returns once the worker has answered. */
+async function attempt({ fromTap = false } = {}) {
   const video = document.querySelector(".scan__video");
-  if (!cv || !video || view.stage !== "camera") return;
+  if (!video || view.stage !== "camera" || busy) return;
 
-  const frame = frameFrom(video);
-  if (!frame) return;
+  const pixels = pixelsFrom(video, video.videoWidth, video.videoHeight);
+  if (!pixels) return;
 
-  const reading = readScorecard(cv, frame, lookup(tour));
-  if (reading.ok) {
-    view.reading = reading;
-    view.sets = reading.sets.map((set) => [...set]);
-    view.stage = "review";
+  busy = true;
+  try {
+    const reading = await readFrame(pixels, tournamentTable());
+    if (view.stage !== "camera") return;
+    if (reading.ok) {
+      accept(reading);
+      return;
+    }
+    hint(t(WHY[reading.reason] || "Hold the whole card in the frame."));
+    if (fromTap && reading.reason === "unknown") {
+      toast(t("That card is from tournament {n}, match {m}.", { n: reading.tournamentNo, m: reading.matchNo }), "error");
+    }
+  } catch (error) {
+    view.stage = "failed";
+    view.problem = t("The image library could not be loaded. Check the connection and try again.");
     stopCamera();
     rerenderView();
-    return;
-  }
-
-  const hint = document.querySelector(".scan__hint");
-  if (hint) hint.textContent = t(WHY[reading.reason] || "Hold the whole card in the frame.");
-  /* A tap is a decision; say why it did not work rather than only hinting. */
-  if (fromTap && reading.reason === "unknown") {
-    toast(t("That card is from tournament {n}, match {m}.", { n: reading.tournamentNo, m: reading.matchNo }), "error");
+  } finally {
+    busy = false;
   }
 }
 
-function scanLoop(tour) {
+function scanLoop() {
   if (view.stage !== "camera") return;
-  attempt(tour);
-  loop = setTimeout(() => scanLoop(tour), 1200);
-}
-
-/** Finds the match a card's three bytes point at, in this tournament or another. */
-function lookup(tour) {
-  return (tournamentNo, matchNo) => {
-    const tournament = tour.no === tournamentNo ? tour : store.list().find((other) => other.no === tournamentNo);
-    if (!tournament) return null;
-    const match = tournament.matches.find((one) => one.no === matchNo && one.status !== "bye");
-    return match ? { tournament, match } : null;
-  };
+  attempt().finally(() => {
+    if (view.stage === "camera") loop = setTimeout(scanLoop, 700);
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -143,6 +193,16 @@ function lookup(tour) {
  * ------------------------------------------------------------------ */
 
 function startPanel() {
+  if (!hasSimd()) {
+    return html`<section class="card scan__intro">
+      <h2>${t("Scan a scorecard")}</h2>
+      <p class="scan__problem">
+        ${t("This browser is too old to read a scorecard. On an iPhone that means iOS 16.4 or newer.")}
+      </p>
+      <a class="btn btn--ghost" href="#/t/${state.tournament.id}/matches">${t("Back")}</a>
+    </section>`;
+  }
+
   return html`<section class="card scan__intro">
     <h2>${t("Scan a scorecard")}</h2>
     <p class="muted">
@@ -162,7 +222,7 @@ function startPanel() {
         <input type="file" accept="image/*" data-field="scan-file" hidden />
       </label>
     </div>
-    ${raw(view.problem ? html`<p class="scan__problem">${view.problem}</p>` : "")}
+    ${raw(view.problem ? html`<p class="scan__problem">${esc(view.problem)}</p>` : "")}
   </section>`;
 }
 
@@ -180,14 +240,24 @@ function cameraPanel() {
   </section>`;
 }
 
-function reviewPanel(tour) {
+function reviewPanel() {
   const { reading } = view;
   const { tournament, match } = reading;
   const names = [sideName(tournament, match, 1), sideName(tournament, match, 2)];
   const unsure = new Set(reading.unsure);
+  const inferred = new Map((reading.inferred || []).map((item) => [item.row, item]));
 
-  const rows = view.sets.map(
-    (set, i) => html`<tr class="${raw(unsure.has(i) ? "scanrow scanrow--unsure" : "scanrow")}">
+  const rows = view.sets.map((set, i) => {
+    const guess = inferred.get(i);
+    const classes = ["scanrow"];
+    if (guess) classes.push("scanrow--inferred");
+    else if (unsure.has(i)) classes.push("scanrow--unsure");
+    const flag = guess
+      ? t("card read {score}", { score: guess.read.map((value) => (value === null ? "?" : value)).join("–") })
+      : unsure.has(i)
+        ? t("check")
+        : "";
+    return html`<tr class="${raw(classes.join(" "))}">
       <th scope="row">${t("Set {n}", { n: i + 1 })}</th>
       <td>
         <input type="number" inputmode="numeric" min="0" max="99" value="${set[0]}" data-field="set" data-set="${i}" data-side="0" />
@@ -195,9 +265,9 @@ function reviewPanel(tour) {
       <td>
         <input type="number" inputmode="numeric" min="0" max="99" value="${set[1]}" data-field="set" data-set="${i}" data-side="1" />
       </td>
-      <td class="scanrow__flag">${raw(unsure.has(i) ? t("check") : "")}</td>
-    </tr>`
-  );
+      <td class="scanrow__flag">${esc(flag)}</td>
+    </tr>`;
+  });
 
   return html`<section class="card scan__review">
     <h2>${t("Match {n}", { n: match.no })} · ${esc(names[0])} ${t("v")} ${esc(names[1])}</h2>
@@ -212,6 +282,13 @@ function reviewPanel(tour) {
 
     <p class="scan__status">${esc(statusText(tournament))}</p>
 
+    ${raw(
+      inferred.size
+        ? html`<p class="scan__note scan__note--inferred">
+            ${t("A score in blue was not a possible one as written. The rules of the game say who had to win that set, and the closest reading of the card is shown — check it.")}
+          </p>`
+        : ""
+    )}
     ${raw(
       reading.totalsAgree === false
         ? html`<p class="scan__problem">${t("The sets won at the foot of the card do not match these scores. Check before saving.")}</p>`
@@ -248,9 +325,8 @@ function statusText(tournament) {
  * saved is always what is on screen.
  */
 function refreshStatus() {
-  const { tournament } = view.reading;
   const line = document.querySelector(".scan__status");
-  if (line) line.textContent = statusText(tournament);
+  if (line) line.textContent = statusText(view.reading.tournament);
 }
 
 export function render(tour) {
@@ -258,7 +334,7 @@ export function render(tour) {
     view.stage === "camera"
       ? cameraPanel()
       : view.stage === "review" && view.reading
-        ? reviewPanel(tour)
+        ? reviewPanel()
         : view.stage === "loading"
           ? html`<section class="card scan__intro">
               <h2>${t("Getting the reader ready")}</h2>
@@ -276,7 +352,7 @@ export function render(tour) {
     ${raw(body)}`;
 }
 
-export function afterRender(tour) {
+export function afterRender() {
   if (view.stage === "start" && !view.cached) {
     isOpenCvCached().then((cached) => {
       if (cached === view.cached) return;
@@ -289,7 +365,10 @@ export function afterRender(tour) {
   if (video && view.stream) {
     video.srcObject = view.stream;
     video.play().catch(() => {});
-    if (!loop) scanLoop(tour);
+    if (!loop && !started) {
+      started = true;
+      scanLoop();
+    }
   }
 }
 
@@ -298,44 +377,43 @@ export function afterRender(tour) {
  * ------------------------------------------------------------------ */
 
 async function ready() {
-  if (cv) return true;
   view.stage = "loading";
   rerenderView();
   try {
-    cv = await loadOpenCv();
+    await warmUp();
     view.cached = true;
     return true;
   } catch (error) {
     view.stage = "failed";
-    view.problem = t("The image library could not be loaded. Check the connection and try again.");
+    view.problem =
+      error && error.message === "simd"
+        ? t("This browser is too old to read a scorecard. On an iPhone that means iOS 16.4 or newer.")
+        : t("The image library could not be loaded. Check the connection and try again.");
     rerenderView();
     return false;
   }
 }
 
-export async function handle(action, target) {
+export async function handle(action) {
   const tour = state.tournament;
 
-  if (action === "scan-start") {
+  if (action === "scan-start" || action === "scan-again") {
+    view.reading = null;
+    view.sets = [];
+    started = false;
     if (!(await ready())) return;
     await startCamera();
     return;
   }
   if (action === "scan-shoot") {
-    attempt(tour, { fromTap: true });
+    attempt({ fromTap: true });
     return;
   }
   if (action === "scan-stop") {
     stopCamera();
+    started = false;
     view.stage = "start";
     rerenderView();
-    return;
-  }
-  if (action === "scan-again") {
-    view.reading = null;
-    view.sets = [];
-    if (!(await ready())) return;
-    await startCamera();
     return;
   }
   if (action === "scan-save") {
@@ -372,9 +450,10 @@ export function change(field, target, event) {
        marked - but the mark only leaves once they are done with the field. */
     if (view.reading && event && event.type === "change") {
       view.reading.unsure = view.reading.unsure.filter((i) => i !== row);
+      view.reading.inferred = (view.reading.inferred || []).filter((item) => item.row !== row);
       const tr = target.closest(".scanrow");
       if (tr) {
-        tr.classList.remove("scanrow--unsure");
+        tr.classList.remove("scanrow--unsure", "scanrow--inferred");
         const flag = tr.querySelector(".scanrow__flag");
         if (flag) flag.textContent = "";
       }
@@ -399,27 +478,22 @@ async function readFile(file) {
       image.onerror = () => reject(new Error("image"));
       image.src = url;
     });
-    const canvas = document.createElement("canvas");
-    const scale = Math.min(1, 1600 / Math.max(image.naturalWidth, image.naturalHeight));
-    canvas.width = Math.round(image.naturalWidth * scale);
-    canvas.height = Math.round(image.naturalHeight * scale);
-    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-
-    const reading = readScorecard(cv, canvas, lookup(state.tournament));
-    if (reading.ok) {
-      view.reading = reading;
-      view.sets = reading.sets.map((set) => [...set]);
-      view.stage = "review";
-      view.problem = "";
-    } else {
-      view.stage = "failed";
-      view.problem = t(WHY[reading.reason] || "That photo could not be read.");
-    }
-  } catch (error) {
+    const pixels = pixelsFrom(image, image.naturalWidth, image.naturalHeight);
+    const reading = await readFrame(pixels, tournamentTable());
+    if (reading.ok && accept(reading)) return;
     view.stage = "failed";
-    view.problem = t("That photo could not be opened.");
+    view.problem = t(reading.ok ? WHY.unknown : WHY[reading.reason] || "That photo could not be read.");
+  } catch (error) {
+    /* Opening the picture and reading it fail in very different ways, and a
+       single "could not be opened" for both hides the one worth acting on. */
+    console.error("scan: reading a chosen photo failed", error);
+    view.stage = "failed";
+    view.problem =
+      error && error.message === "image"
+        ? t("That photo could not be opened.")
+        : t("That photo could not be read.");
   } finally {
     URL.revokeObjectURL(url);
-    rerenderView();
+    if (view.stage !== "review") rerenderView();
   }
 }

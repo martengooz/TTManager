@@ -1041,6 +1041,13 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
 .scanrow--unsure td input { border-color: var(--warn); background: var(--warn-soft); }
 .scanrow__flag { font-size: 0.75rem; color: var(--warn); text-transform: uppercase; letter-spacing: 0.04em; }
 
+/* A row the rules had to reconstruct, which is a different claim: not "this
+   was hard to read" but "this cannot be what the card says, and here is what
+   it must have been". Worth its own colour, and worth saying what was read. */
+.scanrow--inferred td input { border-color: var(--accent); background: var(--accent-soft); font-weight: 650; }
+.scanrow--inferred .scanrow__flag { color: var(--accent); text-transform: none; letter-spacing: 0; }
+.scan__note--inferred { color: var(--accent); }
+
 @media print {
   .scards { gap: 0; width: 190mm; max-width: 100%; margin: 0 auto; }
 
