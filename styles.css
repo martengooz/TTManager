@@ -814,7 +814,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
 
 /* ---------------------------------------------------------------- Printing */
 
-@page { margin: 14mm 12mm; }
+@page { size: A4; margin: 12mm 10mm; }
 
 @media print {
   :root { --line: #c9ced8; --muted: #4b5563; }
@@ -902,6 +902,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
 .printbar__label { font-size: 0.78rem; color: var(--muted); margin-right: 0.15rem; white-space: nowrap; }
 
 .scards { display: grid; gap: 0.8rem; max-width: 900px; margin: 0 auto 3rem; }
+@media screen { .scards { zoom: var(--preview-zoom, 1); } }
 
 /* A form to be written on and then photographed: black on white, closed boxes,
    no fills behind anything handwritten. */
@@ -983,21 +984,36 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
 .scard__foot { margin: 0; font-size: 7.5pt; color: #666; text-align: center; }
 
 @media print {
-  .scards { gap: 0; max-width: none; margin: 0; zoom: 1 !important; }
+  .scards { gap: 0; width: 190mm; max-width: 100%; margin: 0 auto; }
 
-  /* One card fills its own sheet: bigger type, roomier boxes, footer pinned
-     to the bottom, and a page break after every card. */
+  /*
+   * One card to a sheet, at a fixed printed width and its own natural height.
+   * Mobile Safari lays the page out at the device width and then scales it to
+   * the paper, so a CSS millimetre is not a paper millimetre there: a card
+   * that inherited a 320px phone's width, or was told to fill 240mm of height,
+   * came out with a tall narrow ratio and spilled onto a second sheet. Pinning
+   * the width fixes the ratio wherever it prints, and the height it then wants
+   * - around 170mm - sits comfortably inside a page.
+   */
   .scard {
     border-radius: 0;
-    margin: 0;
-    min-height: 240mm;
-    padding: 10mm 12mm;
-    gap: 6mm;
+    width: 190mm;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 8mm 10mm;
+    gap: 4mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
     break-after: page;
+    page-break-after: always;
   }
-  .scard__event b { font-size: 16pt; }
-  .scard__name { font-size: 19pt; }
-  .scard__box { height: 15mm; }
-  .scard__foot { margin-top: auto; }
-  .scards .scard:last-child { break-after: auto; }
+  .scards .scard:last-child { break-after: auto; page-break-after: auto; }
+
+  .scard__event b { font-size: 15pt; }
+  .scard__name { font-size: 17pt; }
+  .scard__head { padding: 0 2mm; }
+  .scard__players { padding: 2mm 2mm; }
+  .scard__box { height: 9mm; }
+  .scard__sign { gap: 2mm 6mm; padding: 0 2mm; }
+  .scard__write { min-height: 7mm; }
 }
