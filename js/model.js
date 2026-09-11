@@ -298,6 +298,7 @@ export function drawTournament(tournament, { random = true } = {}) {
   if (tournament.format === "knockout") {
     buildKnockout(tournament, ids.map((id) => ({ type: "player", playerId: id })));
     refresh(tournament);
+    numberMatches(tournament);
     return tournament;
   }
 
@@ -351,6 +352,20 @@ export function drawTournament(tournament, { random = true } = {}) {
   }
 
   refresh(tournament);
+  numberMatches(tournament);
+  return tournament;
+}
+
+/**
+ * Numbers the matches that will actually be played, in draw order. The number
+ * is what the organiser sees on screen and what a scorecard carries, so it has
+ * to be stable once drawn.
+ */
+export function numberMatches(tournament) {
+  let next = 1;
+  tournament.matches.forEach((match) => {
+    match.no = match.status === "bye" ? null : next++;
+  });
   return tournament;
 }
 

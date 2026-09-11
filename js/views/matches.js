@@ -23,7 +23,7 @@ function matchesQuery(tour, match, query) {
     model.playerName(tour, match.p1),
     model.playerName(tour, match.p2),
     model.matchLabel(tour, match),
-    String(match.number || ""),
+    String(match.no || ""),
   ]
     .join(" ")
     .toLowerCase();
@@ -42,13 +42,7 @@ export function render(tour) {
     </section>`;
   }
 
-  const numbering = new Map();
-  tour.matches
-    .filter((m) => m.status !== "bye")
-    .forEach((m, index) => {
-      numbering.set(m.id, index + 1);
-      m.number = index + 1; // so a search for "12" finds match #12
-    });
+  if (tour.matches.some((m) => m.status !== "bye" && !m.no)) model.numberMatches(tour);
 
   const groupSections = tour.groups
     .filter((group) => state.groupFilter === "all" || state.groupFilter === group.id)
@@ -63,7 +57,7 @@ export function render(tour) {
         </h2>
         ${raw(
           shown.length
-            ? `<div class="matchgrid">${shown.map((m) => matchCard(tour, m, { number: numbering.get(m.id), showStage: false })).join("")}</div>`
+            ? `<div class="matchgrid">${shown.map((m) => matchCard(tour, m, { number: m.no, showStage: false })).join("")}</div>`
             : `<p class="muted">${esc(state.search ? t("Nothing matches “{query}”.", { query: state.search }) : t("Nothing here with the current filter."))}</p>`
         )}
       </section>`;
@@ -79,7 +73,7 @@ export function render(tour) {
             <h2 class="card__title">${round.name}</h2>
             ${raw(
               shown.length
-                ? `<div class="matchgrid">${shown.map((m) => matchCard(tour, m, { number: numbering.get(m.id), showStage: false })).join("")}</div>`
+                ? `<div class="matchgrid">${shown.map((m) => matchCard(tour, m, { number: m.no, showStage: false })).join("")}</div>`
                 : `<p class="muted">${esc(state.search ? t("Nothing matches “{query}”.", { query: state.search }) : t("Nothing here with the current filter."))}</p>`
             )}
           </section>`;
@@ -89,7 +83,7 @@ export function render(tour) {
   if (third && state.groupFilter === "all" && visible(tour, [third]).length) {
     koSections.push(html`<section class="card">
       <h2 class="card__title">${t("Third place")}</h2>
-      <div class="matchgrid">${raw(matchCard(tour, third, { number: numbering.get(third.id), showStage: false }))}</div>
+      <div class="matchgrid">${raw(matchCard(tour, third, { number: third.no, showStage: false }))}</div>
     </section>`);
   }
 

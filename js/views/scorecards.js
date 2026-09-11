@@ -6,6 +6,7 @@ import * as model from "../model.js";
 import { html, raw, esc, formatDate } from "../util.js";
 import { t } from "../i18n.js";
 import { rerenderView } from "../app.js";
+import { svg as qrSvg } from "../qr.js";
 
 const options = {
   scope: "ready", // ready = both players known and no result yet
@@ -18,7 +19,7 @@ const SCOPES = [
   { id: "all", label: "All matches" },
 ];
 
-const PER_PAGE = [1, 2, 4];
+const PER_PAGE = [1, 2];
 
 /* Draw order is also the order the matches are numbered in, so the cards come
    off the printer in the order the organiser sees them on screen. */
@@ -44,27 +45,48 @@ function club(tour, match, side) {
   return player ? player.club : "";
 }
 
-function card(tour, match, number) {
-  const sets = Array.from({ length: tour.settings.bestOf }, (_, i) => i + 1);
-  const nameCell = (side) => {
-    const name = sideName(tour, match, side);
-    const known = !!(side === 1 ? match.p1 : match.p2);
+const SET_ROWS = 7;
+
+/* One byte of tournament, two of match: the smallest payload that says which
+   match a sheet belongs to, which keeps the code at version 1 and its modules
+   large enough to read from a photograph. */
+function codeFor(tour, match) {
+  const tournamentNo = Math.max(1, Math.min(255, tour.no || 1));
+  const matchNo = Math.max(0, Math.min(65535, match.no || 0));
+  return [tournamentNo, (matchNo >> 8) & 0xff, matchNo & 0xff];
+}
+
+function card(tour, match) {
+  const sets = Array.from({ length: Math.max(tour.settings.bestOf, SET_ROWS) }, (_, i) => i + 1);
+  const side = (n) => {
+    const playerId = n === 1 ? match.p1 : match.p2;
+    const player = model.playerById(tour, playerId);
+    const name = playerId ? model.playerName(tour, playerId) : sideName(tour, match, n);
     return `<div class="scard__player">
-      <span class="scard__name${known ? "" : " scard__name--blank"}">${esc(name)}</span>
-      <span class="scard__club">${esc(club(tour, match, side))}</span>
+      <span class="scard__key">${n === 1 ? "A" : "B"}</span>
+      <span class="scard__name${playerId ? "" : " scard__name--blank"}">${esc(name)}</span>
+      <span class="scard__club">${esc(player ? player.club : "")}</span>
     </div>`;
   };
-  const row = (side) => `<tr>
-    <th scope="row">${esc((side === 1 ? match.p1 : match.p2) ? sideName(tour, match, side) : t("Player {n}", { n: side }))}</th>
-    ${sets.map(() => '<td class="scard__box"></td>').join("")}
-    <td class="scard__box scard__box--total"></td>
-  </tr>`;
 
   return html`<article class="scard">
+    <span class="scard__anchor scard__anchor--tl"></span>
+    <span class="scard__anchor scard__anchor--tr"></span>
+    <span class="scard__anchor scard__anchor--bl"></span>
+    <span class="scard__anchor scard__anchor--br"></span>
+
     <header class="scard__head">
       <div class="scard__event">
         <b>${tour.name}</b>
         <span>${raw([formatDate(tour.date), tour.venue].filter(Boolean).map(esc).join(" · "))}</span>
+        <span class="scard__meta">
+          ${t("Match {n}", { n: match.no || "—" })} · ${model.matchLabel(tour, match)} ·
+          ${t("Best of {n} to {points}", { n: tour.settings.bestOf, points: tour.settings.pointsPerSet })}
+        </span>
+      </div>
+      <div class="scard__ident">
+        ${raw(qrSvg(codeFor(tour, match), { size: "24mm", label: `T${tour.no || 1} M${match.no || 0}` }))}
+        <span class="scard__code">T${tour.no || 1}·M${match.no || 0}</span>
       </div>
       <div class="scard__table">
         <span>${t("Table")}</span>
@@ -72,36 +94,38 @@ function card(tour, match, number) {
       </div>
     </header>
 
-    <p class="scard__meta">
-      ${t("Match {n}", { n: number })} · ${model.matchLabel(tour, match)} ·
-      ${t("Best of {n} to {points}", { n: tour.settings.bestOf, points: tour.settings.pointsPerSet })}
-    </p>
-
     <div class="scard__players">
-      ${raw(nameCell(1))}
-      <span class="scard__v">${t("v")}</span>
-      ${raw(nameCell(2))}
+      ${raw(side(1))}
+      ${raw(side(2))}
     </div>
 
     <table class="scard__sets">
       <thead>
         <tr>
-          <th scope="col">${t("Set")}</th>
-          ${sets.map((n) => `<th scope="col">${n}</th>`)}
-          <th scope="col">${t("Sets won")}</th>
+          <th scope="col">A</th>
+          <th scope="col" class="scard__setcol">${t("Set")}</th>
+          <th scope="col">B</th>
         </tr>
       </thead>
       <tbody>
-        ${raw(row(1))}
-        ${raw(row(2))}
+        ${sets.map(
+          (n) => `<tr><td class="scard__box"></td><th scope="row" class="scard__setcol">${n}</th><td class="scard__box"></td></tr>`
+        )}
+        <tr class="scard__won">
+          <td class="scard__box scard__box--total"></td>
+          <th scope="row" class="scard__setcol">${t("Sets won")}</th>
+          <td class="scard__box scard__box--total"></td>
+        </tr>
       </tbody>
     </table>
 
     <div class="scard__sign">
-      <label><span>${t("Winner")}</span><span class="scard__write"></span></label>
+      <label class="scard__winner">
+        <span>${t("Winner")}</span>
+        <span class="scard__ticks"><i class="scard__tick"></i>A <i class="scard__tick"></i>B</span>
+      </label>
       <label><span>${t("Winner's signature")}</span><span class="scard__write"></span></label>
-      <label><span>${t("Umpire")}</span><span class="scard__write"></span></label>
-      <label><span>${t("Umpire's signature")}</span><span class="scard__write"></span></label>
+      <label><span>${t("Umpire & signature")}</span><span class="scard__write"></span></label>
     </div>
 
     <p class="scard__foot">${t("Hand this to the organiser after the match.")}</p>
@@ -110,8 +134,7 @@ function card(tour, match, number) {
 
 export function render(tour) {
   const matches = wanted(tour);
-  const numbering = new Map();
-  tour.matches.filter((m) => m.status !== "bye").forEach((m, index) => numbering.set(m.id, index + 1));
+  if (tour.matches.some((m) => m.status !== "bye" && !m.no)) model.numberMatches(tour);
 
   const controls = html`<div class="printbar no-print">
     <a class="btn btn--ghost" href="#/t/${tour.id}/matches">← ${t("Back")}</a>
@@ -163,7 +186,7 @@ export function render(tour) {
 
   return html`${raw(controls)}
     <div class="scards" data-per-page="${options.perPage}">
-      ${matches.map((match) => raw(card(tour, match, numbering.get(match.id))))}
+      ${matches.map((match) => raw(card(tour, match)))}
     </div>`;
 }
 

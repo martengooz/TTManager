@@ -249,6 +249,7 @@ const SV = {
   "Winner's signature": "Vinnarens namnteckning",
   "Umpire": "Domare",
   "Umpire's signature": "Domarens namnteckning",
+  "Umpire & signature": "Domare och namnteckning",
   "Hand this to the organiser after the match.": "Lämna det här till tävlingsledningen efter matchen.",
   "Nothing to print": "Inget att skriva ut",
   "No match fits that choice — every one either has a result or is waiting on an earlier round.":

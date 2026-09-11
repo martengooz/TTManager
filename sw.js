@@ -15,6 +15,7 @@ const ASSETS = [
   "icons/icon-512.png",
   "js/app.js",
   "js/model.js",
+  "js/qr.js",
   "js/store.js",
   "js/util.js",
   "js/components.js",
