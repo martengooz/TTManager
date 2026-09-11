@@ -16,6 +16,9 @@
   --win: #0b7a45;
   --win-soft: #e6f5ec;
   --danger: #b42318;
+  /* A reading the scorecard scanner is not sure of: wrong rather than broken. */
+  --warn: #b26a00;
+  --warn-soft: #fff7e6;
   /* Spacing that the view setting scales. */
   --card-pad: 0.75rem 0.85rem;
   --card-gap: 0.6rem;
@@ -982,6 +985,61 @@ input[type="search"] { -webkit-appearance: none; appearance: none; border-radius
 .scard__tick + * { margin-left: 2mm; }
 .scard__write { border-bottom: 1px solid #111; min-height: 8mm; display: block; }
 .scard__foot { margin: 0; font-size: 7.5pt; color: #666; text-align: center; }
+
+/* ------------------------------------------------------- Scanning a card */
+
+/* The same bar the scorecard screens use: this screen has no tabs either. */
+.scanbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.scanbar__gap { flex: 1; }
+
+.scan__intro, .scan__review { max-width: 620px; margin: 0.8rem auto; }
+.scan__intro h2, .scan__review h2 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+.scan__weight { font-size: 0.85rem; color: var(--muted); }
+.scan__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; align-items: center; }
+.scan__actions .btn { flex: 1 1 auto; justify-content: center; }
+.scan__problem { color: var(--danger); font-size: 0.9rem; margin: 0.6rem 0 0; }
+.scan__note { color: var(--muted); font-size: 0.85rem; margin: 0.6rem 0 0; }
+/* Says what the sets add up to, or why they do not add up to anything yet.
+   Updated in place as the fields are edited, like the score dialog's. */
+.scan__status { margin: 0.6rem 0 0; font-size: 0.9rem; font-weight: 600; }
+
+/* The viewfinder fills what is left of the screen: a card held up to a phone
+   wants every pixel, and the corner marks have to be inside the frame. */
+.scan__camera { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.7rem; }
+.scan__frame { position: relative; background: #000; border-radius: 8px; overflow: hidden; }
+.scan__video { display: block; width: 100%; max-height: 66vh; object-fit: contain; background: #000; }
+.scan__guide {
+  position: absolute;
+  inset: 8% 5%;
+  border: 2px dashed rgba(255, 255, 255, 0.65);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.scan__hint { margin: 0; text-align: center; font-size: 0.9rem; color: var(--muted); min-height: 1.2em; }
+
+.scan__sets { width: 100%; border-collapse: collapse; margin-top: 0.6rem; }
+.scan__sets th, .scan__sets td { padding: 0.25rem 0.35rem; text-align: left; }
+.scan__sets thead th { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.scan__sets tbody th { font-weight: 600; font-size: 0.9rem; white-space: nowrap; }
+.scan__sets input {
+  width: 100%;
+  max-width: 5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* A row the reader is not sure of, so the organiser knows where to look. */
+.scanrow--unsure td input { border-color: var(--warn); background: var(--warn-soft); }
+.scanrow__flag { font-size: 0.75rem; color: var(--warn); text-transform: uppercase; letter-spacing: 0.04em; }
 
 @media print {
   .scards { gap: 0; width: 190mm; max-width: 100%; margin: 0 auto; }

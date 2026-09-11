@@ -61,6 +61,24 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
 - Or print one match on its own: every match card carries a small printer button that opens that
   card and sends it straight to the printer, for when a single table is about to start.
 
+**Read the cards back in**
+- *Scan a scorecard* in the ⋯ menu points the camera at a card an umpire has handed
+  back. The QR code says which match it is, the corner marks let it square up a photo
+  taken at an angle, and the set scores are read out of the boxes.
+- It keeps trying by itself while you hold the card up, so usually there is nothing to
+  tap; there is a button for when you would rather pick the moment, and *Choose a photo*
+  for a picture you already took or a card scanned on a desktop.
+- Nothing is saved without being shown. The scores appear as ordinary editable fields,
+  the rows the reader was unsure of are marked, and it tells you if the *sets won* at the
+  foot of the card disagrees with the scores above it.
+- What makes it work is the rules: only a few readings of a blurred box make a legal set
+  that adds up to a finished match, so a 9 that looks like a 4 usually settles itself.
+  On a test set of sixty synthesised card photographs it read 57 exactly right and marked
+  a row on every one of the three it got wrong - but those are made-up photographs, so
+  give the scores a glance before you save.
+- The image library it needs is about 10 MB. It downloads the first time you scan and is
+  cached afterwards, so scanning works offline like everything else.
+
 **Print it**
 - The print screen composes the whole tournament into one document: header, player list,
   every group table, results grid and match score, the knockout results, the bracket and the
@@ -121,6 +139,9 @@ version.js              the app version, read by the page and by the service wor
 sw.js                   offline cache, named after the version
 js/i18n.js              translations; keys are the English strings themselves
 js/qr.js                QR encoder for the scorecard codes, level Q
+js/scan/                reading a filled-in card back: OpenCV, digit classifier, rules
+vendor/                 OpenCV, fetched only when a card is scanned
+tools/                  trains the digit classifier; not part of the app
 js/settings.js          language, view density and score entry preferences
 js/model.js             draw, schedule, scoring rules, standings, bracket
 js/store.js             local storage, export and import

@@ -33,7 +33,10 @@ shows in the start screen footer, so you can check what a phone is actually runn
 | `js/store.js` | local storage, export and import |
 | `js/components.js` | shared rendering: match cards, tables, bracket, podium |
 | `js/app.js` | router, shared state, score dialog |
-| `js/views/` | one module per screen; `print.js` and `scorecards.js` render without app chrome |
+| `js/views/` | one module per screen; `print.js`, `scorecards.js` and `scan.js` render without app chrome |
+| `js/scan/` | reading a filled-in scorecard back: OpenCV pipeline, digit classifier, rules |
+| `vendor/` | OpenCV, loaded only when a card is scanned |
+| `tools/` | the training script for the digit classifier; nothing the app loads |
 | `sw.js` | offline cache |
 
 ## Built for one-handed use at the table
@@ -71,6 +74,48 @@ If the encoder is ever changed, verify it by encoding, rendering and decoding wi
 decoder. Comparing modules against another encoder is not enough on its own: a reference encoder
 may quietly raise the error correction level when there is room in the symbol, which makes a
 correct symbol look wrong.
+
+## Reading a card back
+
+`js/scan/` turns a photograph of a filled-in card into a result. Four steps, kept
+apart because each is worth being able to test on its own:
+
+| Module | Knows about |
+| --- | --- |
+| `card.js` | paper and lenses: finds the corner marks, squares the card up, decodes the QR, finds the ruled boxes, cuts out each digit |
+| `digits.js` | handwriting: a small convolutional network, weights in `digit-model.js` |
+| `reconcile.js` | table tennis: picks the most likely reading the rules of the game allow |
+| `read.js` | the tournament the card belongs to, and nothing else |
+
+Two things are worth knowing before changing any of it.
+
+**The rules do most of the work.** Only a few of the readings a blurred box
+allows make a legal set, and only a few sequences of those add up to a finished
+match, so the rules overturn misread digits that no amount of looking at the
+shape would settle. That is why the classifier hands `reconcile` whole
+distributions rather than its best guess: narrowing them early throws the
+leverage away. The same goes for a digit that had to be cut in two - both
+readings go forward, because a nought cut down the middle is a convincing 62 and
+only the rules can tell.
+
+**It is never certain, so it never saves silently.** Every row comes back with a
+confidence, the screen marks the ones below `SURE_ENOUGH`, and saving is a
+deliberate tap. Over sixty synthesised photographs - real handwritten digits
+composited into a rendered card, then put through perspective, shadow, blur,
+noise and JPEG - 57 read exactly right and all three misreadings came back with
+a row marked. Keep that last property: a wrong score saved without anyone
+noticing is worse than a reader that admits it is stuck. Synthesised cards are
+not photographs of real ones, so treat the figure as a regression baseline
+rather than a promise.
+
+`vendor/opencv-4.9.0.js` is ten megabytes, so it is not in the service worker's
+install list. It is fetched the first time someone scans and cached from there,
+which is why `js/scan/opencv.js` loads it with a script tag: fetching it into
+the JavaScript heap first, to show a progress bar, runs the renderer out of
+memory. That module also deletes `cv.then` before resolving. Emscripten's module
+object is a thenable, so resolving a promise with it makes the promise machinery
+chase it forever and the tab stops responding - no error, nothing in the
+console, just a page that has stopped.
 
 ## Two printed things, for different readers
 

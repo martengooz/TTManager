@@ -11,9 +11,10 @@ import * as standings from "./views/standings.js";
 import * as bracket from "./views/bracket.js";
 import * as printView from "./views/print.js";
 import * as scorecards from "./views/scorecards.js";
+import * as scan from "./views/scan.js";
 import { sideName } from "./components.js";
 
-const VIEWS = { setup, matches, standings, bracket, print: printView, scorecards };
+const VIEWS = { setup, matches, standings, bracket, print: printView, scorecards, scan };
 const TABS = ["setup", "matches", "standings", "bracket", "print"];
 const TAB_LABELS = { setup: "Setup", matches: "Matches", standings: "Standings", bracket: "Bracket", print: "Print" };
 
@@ -60,6 +61,7 @@ function chrome(tournament, view) {
           <div class="menu__list">
             <a class="menu__item" href="#/t/${tournament.id}/print">${t("Print / Save as PDF")}</a>
             <a class="menu__item" href="#/t/${tournament.id}/scorecards">${t("Umpire scorecards")}</a>
+            <a class="menu__item" href="#/t/${tournament.id}/scan">${t("Scan a scorecard")}</a>
             <button type="button" class="menu__item" data-action="export">${t("Export as JSON")}</button>
             <button type="button" class="menu__item" data-action="duplicate-current">${t("Duplicate tournament")}</button>
             <button type="button" class="menu__item" data-action="settings">${t("Settings")}</button>
@@ -111,11 +113,15 @@ export function render() {
     return;
   }
   state.tournament = tournament;
-  state.view = VIEWS[route.view] ? route.view : "setup";
+  const nextView = VIEWS[route.view] ? route.view : "setup";
+  /* A screen that holds on to something the browser gave it - the camera, so
+     far - gets told before it is replaced. */
+  if (nextView !== state.view && VIEWS[state.view] && VIEWS[state.view].leave) VIEWS[state.view].leave();
+  state.view = nextView;
   state.arg = route.arg;
 
   const view = VIEWS[state.view];
-  const bare = state.view === "print" || state.view === "scorecards";
+  const bare = state.view === "print" || state.view === "scorecards" || state.view === "scan";
   app.innerHTML = bare
     ? view.render(tournament)
     : chrome(tournament, state.view) + `<main class="view view--${state.view}">${view.render(tournament)}</main>`;
@@ -647,7 +653,7 @@ function wireGlobal() {
     });
   });
 
-  on(app, "input", "input[type=text], input[type=date], textarea", (event, target) => {
+  on(app, "input", "input[type=text], input[type=date], input[type=number], textarea", (event, target) => {
     if (!target.dataset.field) return;
     const view = VIEWS[state.view];
     if (view && view.change) view.change(target.dataset.field, target, event);

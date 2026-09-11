@@ -26,6 +26,13 @@ const ASSETS = [
   "js/views/bracket.js",
   "js/views/print.js",
   "js/views/scorecards.js",
+  "js/views/scan.js",
+  "js/scan/card.js",
+  "js/scan/digits.js",
+  "js/scan/digit-model.js",
+  "js/scan/opencv.js",
+  "js/scan/read.js",
+  "js/scan/reconcile.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -46,8 +53,15 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-/* Navigations fall back to the cached shell; assets are cache-first with a
-   background refresh so a new deploy is picked up on the next visit. */
+/*
+ * Navigations fall back to the cached shell; assets are cache-first with a
+ * background refresh so a new deploy is picked up on the next visit.
+ *
+ * vendor/opencv.js is not in ASSETS on purpose - it is ten megabytes and only
+ * the scorecard reader needs it - but it is cached here like anything else the
+ * moment it is first fetched, which is what makes scanning work offline
+ * afterwards.
+ */
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
