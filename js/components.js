@@ -18,6 +18,10 @@ import {
 
 const MEDALS = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
+const PRINTER = `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+  <path fill="currentColor" d="M4.5 1.5h7a1 1 0 0 1 1 1V5h-9V2.5a1 1 0 0 1 1-1Zm-2 4.5h11a1.5 1.5 0 0 1 1.5 1.5v3A1.5 1.5 0 0 1 13.5 12h-1v2.5a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V12h-1A1.5 1.5 0 0 1 1 10.5v-3A1.5 1.5 0 0 1 2.5 6Zm2 5v3h7v-3h-7Zm8-3.25a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/>
+</svg>`;
+
 export function sideName(tournament, match, side) {
   const playerId = side === 1 ? match.p1 : match.p2;
   if (playerId) return playerName(tournament, playerId);
@@ -50,6 +54,11 @@ export function matchCard(tournament, match, { interactive = true, number = null
       ${raw(match.status === "bye" ? `<span class="tag">${esc(t("bye"))}</span>` : "")}
       ${raw(walkover ? `<span class="tag">${esc(t("w/o"))}</span>` : "")}
       ${raw(interactive ? `<span class="match__cta">${esc(decided ? t("Edit") : t("Enter score"))}</span>` : "")}
+      ${raw(
+        interactive && match.status !== "bye"
+          ? `<button type="button" class="match__print" data-action="print-card" data-match="${esc(match.id)}" title="${esc(t("Print scorecard"))}" aria-label="${esc(t("Print scorecard"))}">${PRINTER}</button>`
+          : ""
+      )}
     </header>
     <div class="match__players">
       <div class="side${raw(winnerClass(match.p1))}">

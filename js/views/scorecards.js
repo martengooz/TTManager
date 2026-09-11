@@ -5,7 +5,7 @@
 import * as model from "../model.js";
 import { html, raw, esc, formatDate } from "../util.js";
 import { t } from "../i18n.js";
-import { rerenderView } from "../app.js";
+import { state, rerenderView } from "../app.js";
 import { svg as qrSvg } from "../qr.js";
 
 /* One match to a sheet: a card is handed to an umpire at a table, so two
@@ -131,9 +131,30 @@ function card(tour, match) {
   </article>`;
 }
 
+/** The one match named in the route, if there is one. */
+function single(tour) {
+  if (!state.arg) return null;
+  const wanted = Number(state.arg);
+  return tour.matches.find((match) => match.no === wanted) || null;
+}
+
 export function render(tour) {
-  const matches = wanted(tour);
   if (tour.matches.some((m) => m.status !== "bye" && !m.no)) model.numberMatches(tour);
+
+  const one = single(tour);
+  if (one) {
+    return html`<div class="printbar no-print">
+        <a class="btn btn--ghost" href="#/t/${tour.id}/matches">← ${t("Back")}</a>
+        <span class="printbar__one">
+          ${t("Match {n}", { n: one.no })} · ${sideName(tour, one, 1)} ${t("v")} ${sideName(tour, one, 2)}
+        </span>
+        <a class="btn btn--ghost btn--small" href="#/t/${tour.id}/scorecards">${t("All scorecards")}</a>
+        <button class="btn btn--primary" data-action="do-print">${t("Print / Save as PDF")}</button>
+      </div>
+      <div class="scards">${raw(card(tour, one))}</div>`;
+  }
+
+  const matches = wanted(tour);
 
   const controls = html`<div class="printbar no-print">
     <a class="btn btn--ghost" href="#/t/${tour.id}/matches">← ${t("Back")}</a>
@@ -175,6 +196,44 @@ export function render(tour) {
     <div class="scards">
       ${matches.map((match) => raw(card(tour, match)))}
     </div>`;
+}
+
+/* Arriving from the printer button on a match means print this one now. */
+let printed = null;
+
+/*
+ * The card is drawn at its real size in millimetres, which is wider than a
+ * phone. On screen the preview is zoomed down to fit; zoom rather than a
+ * transform, so the page height follows. Printing always uses full size.
+ */
+function fitPreview() {
+  const list = document.querySelector(".scards");
+  if (!list) return;
+  list.style.zoom = "1";
+  const card = list.querySelector(".scard");
+  if (!card) return;
+  const available = list.clientWidth;
+  const natural = card.getBoundingClientRect().width;
+  if (natural > available && available > 0) list.style.zoom = String(Math.max(0.25, available / natural));
+}
+
+let watchingResize = false;
+
+export function afterRender(tour) {
+  fitPreview();
+  if (!watchingResize) {
+    watchingResize = true;
+    window.addEventListener("resize", fitPreview);
+  }
+
+  if (!state.arg) {
+    printed = null;
+    return;
+  }
+  const key = `${tour.id}/${state.arg}`;
+  if (printed === key) return;
+  printed = key;
+  setTimeout(() => window.print(), 150);
 }
 
 export function handle(action, target) {

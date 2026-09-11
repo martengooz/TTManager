@@ -76,9 +76,12 @@ correct symbol look wrong.
 
 `print.js` is the tournament record: results, tables, bracket, placings — read after the fact.
 `scorecards.js` is a blank form the umpire writes on at the table and hands back, so it is
-built for ink: black on white, ruled boxes, no fills, and sized by a cards-per-page setting
-that paginates with `break-after`. Neither renders the topbar, so both carry their own back
-link, and neither should gain screen-only ornament.
+built for ink: black on white, ruled boxes, no fills, one match to a sheet. Neither renders the
+topbar, so both carry their own back link, and neither should gain screen-only ornament.
+
+`#/t/<id>/scorecards/<match number>` renders a single card and prints it — that is where the
+printer button on a match card leads. The card is drawn at its real size in millimetres, wider
+than a phone, so the preview is zoomed to fit on screen and printed at full size.
 
 ## Worth knowing
 

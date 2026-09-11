@@ -3,7 +3,7 @@ import * as model from "../model.js";
 import { html, raw, esc } from "../util.js";
 import { t } from "../i18n.js";
 import { matchCard } from "../components.js";
-import { state, rerenderView } from "../app.js";
+import { state, rerenderView, navigate } from "../app.js";
 
 function visible(tour, matches) {
   const query = state.search.trim().toLowerCase();
@@ -141,6 +141,11 @@ export function afterRender() {
 }
 
 export function handle(action, target) {
+  if (action === "print-card") {
+    const match = state.tournament.matches.find((m) => m.id === target.dataset.match);
+    if (match) navigate(`#/t/${state.tournament.id}/scorecards/${match.no}`);
+    return;
+  }
   if (action === "filter") {
     state.filter = target.dataset.value;
     rerenderView();

@@ -236,6 +236,8 @@ const SV = {
 
   // Umpire scorecards
   "Umpire scorecards": "Matchprotokoll",
+  "Print scorecard": "Skriv ut matchprotokoll",
+  "All scorecards": "Alla protokoll",
   "Matches to print": "Matcher att skriva ut",
   "Ready to play": "Kan spelas nu",
   "Still to play": "Kvar att spela",

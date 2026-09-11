@@ -58,6 +58,8 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
 - Print the matches that can start now, everything still to play, or all of them. One match to a
   sheet, since a card goes to an umpire at a table. The umpire fills it in and hands it back, and
   the organiser types the result in from the card.
+- Or print one match on its own: every match card carries a small printer button that opens that
+  card and sends it straight to the printer, for when a single table is about to start.
 
 **Print it**
 - The print screen composes the whole tournament into one document: header, player list,
