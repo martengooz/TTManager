@@ -252,7 +252,38 @@ def quantise(a):
     return q, scale
 
 
-def emit(net, accuracy, epochs):
+def confusion(net, x, y, passes=20, batch=1000):
+    """
+    Which digits this network mistakes for which, measured rather than guessed.
+
+    The reader needs this because a softmax is overconfident: told a box says
+    16 it will put almost all its mass there and almost none on 18, even though
+    a written 6 read as an 8 is a common thing and a written 6 read as a 4 is
+    not. When the rules of the game rule out 16, that difference is the whole
+    basis for choosing what the card really said, so the ranking has to come
+    from somewhere honest.
+
+    It is measured on the held-out set put through the same augmentation the
+    training used, for two reasons. Clean MNIST is far easier than a biro on a
+    card photographed in a hall, so a matrix measured on it comes out nearly
+    diagonal and every off-diagonal entry is one or two samples of noise -
+    useless for ranking. And twenty passes of augmentation is two hundred
+    thousand samples, which is enough for the entries that matter to mean
+    something.
+
+    Returns P(read as s | written t), smoothed so nothing is impossible.
+    """
+    counts = np.full((10, 10), 0.5)
+    for _ in range(passes):
+        order = rng.permutation(len(x))
+        for i in range(0, len(order), batch):
+            pick = order[i:i + batch]
+            guess = net.forward(augment(x[pick]).reshape(-1, 1, 28, 28)).argmax(axis=1)
+            np.add.at(counts, (y[pick], guess), 1)
+    return counts / counts.sum(axis=1, keepdims=True)
+
+
+def emit(net, accuracy, epochs, confusion_matrix):
     parts = []
     for name, layer in (("c1", net.c1), ("c2", net.c2), ("fc", net.fc)):
         qw, sw = quantise(layer.w)
@@ -290,6 +321,18 @@ def emit(net, accuracy, epochs):
         lines.append("")
     lines.append("export const SHAPE = { conv1: [1, 12, 5], conv2: [12, 24, 5], dense: [384, 10] };")
     lines.append(f"export const ACCURACY = {accuracy:.4f};")
+    lines.append("")
+    lines.append("/*")
+    lines.append(" * How often this network reads a written digit as another one, measured on the")
+    lines.append(" * MNIST test set: CONFUSION[written][read as]. The reader uses it to rank what")
+    lines.append(" * a box might really have said once the rules of the game have ruled out what")
+    lines.append(" * it appears to say - a softmax on its own is too sure of itself to be useful")
+    lines.append(" * for that.")
+    lines.append(" */")
+    lines.append("export const CONFUSION = [")
+    for row in confusion_matrix:
+        lines.append("  [" + ", ".join(f"{v:.5f}" for v in row) + "],")
+    lines.append("];")
     lines.append("")
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text("\n".join(lines))
@@ -350,9 +393,21 @@ def main():
         acc = evaluate(net, test_x, test_y)
         print(f"epoch {epoch + 1:2d}  loss {loss_sum / seen:.4f}  test {acc:.4%}", flush=True)
 
+    # Measure the network that actually ships, not the one in memory: the
+    # weights lose a little to int8 on the way out, and the confusion matrix
+    # the reader leans on should describe what it will really be running.
+    for layer in net.layers:
+        q, scale = quantise(layer.w)
+        layer.w = (q.astype(np.float32) * scale)
+
     acc = evaluate(net, test_x, test_y)
-    count = emit(net, acc, args.epochs)
+    matrix = confusion(net, test_x, test_y)
+    count = emit(net, acc, args.epochs, matrix)
+    worst = sorted(
+        ((matrix[t][s], t, s) for t in range(10) for s in range(10) if t != s), reverse=True
+    )[:5]
     print(f"wrote {OUT} - {count} weights, {OUT.stat().st_size / 1024:.1f} kB, {acc:.4%}")
+    print("most confusable: " + ", ".join(f"{t} read as {s} {p:.2%}" for p, t, s in worst))
 
 
 if __name__ == "__main__":

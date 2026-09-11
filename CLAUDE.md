@@ -35,8 +35,8 @@ shows in the start screen footer, so you can check what a phone is actually runn
 | `js/app.js` | router, shared state, score dialog |
 | `js/views/` | one module per screen; `print.js`, `scorecards.js` and `scan.js` render without app chrome |
 | `js/scan/` | reading a filled-in scorecard back: OpenCV pipeline, digit classifier, rules |
-| `vendor/` | OpenCV, loaded only when a card is scanned |
-| `tools/` | the training script for the digit classifier; nothing the app loads |
+| `vendor/` | OpenCV, built for this app, loaded only when a card is scanned |
+| `tools/` | how the two generated things are generated; nothing the app loads |
 | `sw.js` | offline cache |
 
 ## Built for one-handed use at the table
@@ -85,37 +85,64 @@ apart because each is worth being able to test on its own:
 | `card.js` | paper and lenses: finds the corner marks, squares the card up, decodes the QR, finds the ruled boxes, cuts out each digit |
 | `digits.js` | handwriting: a small convolutional network, weights in `digit-model.js` |
 | `reconcile.js` | table tennis: picks the most likely reading the rules of the game allow |
-| `read.js` | the tournament the card belongs to, and nothing else |
+| `read.js` | which tournament and match the card belongs to |
 
-Two things are worth knowing before changing any of it.
+It all runs in `worker.js`, a module worker, with `reader.js` as the page's end
+of it. Nothing under `js/scan/` may touch the DOM: a frame arrives as raw RGBA
+bytes and leaves as numbers. That is also why the frame buffer is passed as a
+transfer and handed back with the answer - a scanning session allocates one
+buffer, not one a second - and why the full-frame Mats live in `card.js`'s
+`scratch` between frames instead of being reallocated.
 
-**The rules do most of the work.** Only a few of the readings a blurred box
-allows make a legal set, and only a few sequences of those add up to a finished
-match, so the rules overturn misread digits that no amount of looking at the
-shape would settle. That is why the classifier hands `reconcile` whole
-distributions rather than its best guess: narrowing them early throws the
-leverage away. The same goes for a digit that had to be cut in two - both
-readings go forward, because a nought cut down the middle is a convincing 62 and
-only the rules can tell.
+Three things are worth knowing before changing any of it.
+
+**The rules do most of the work, and they do it by proposing rather than
+checking.** `reconcile.js` does not read the boxes and then test whether the
+answer is legal. It enumerates every score a set can legally end on - there are
+only a few dozen - asks the ink what it thinks of each, and searches for the
+most likely reading of the whole card. That is what lets it repair a box
+outright. A card reading 4-11, 6-11, 16-16, 9-11 is impossible as written; had
+the second player won the third set the match would have ended there at 0-3, and
+yet a fourth set was played, so the first player won it and it was 18-16 or
+16-14. Nothing about that reasoning is available to a classifier looking at one
+box, so nothing downstream of the classifier may collapse a distribution to its
+best guess - `digits.js` hands over per-digit distributions for exactly this
+reason.
+
+**Which is why the model ships a confusion matrix.** Choosing between 18-16 and
+16-14 is choosing whether a 6 was really an 8 or a 4, and a softmax is not
+entitled to an opinion at that end of its range - shown a clear 6 it will say
+0.9997 and leave noise for everything else. `CONFUSION` in `digit-model.js` is
+what the network is measured to do with augmented digits, and `MEASURED_SHARE`
+of every distribution comes from it.
 
 **It is never certain, so it never saves silently.** Every row comes back with a
-confidence, the screen marks the ones below `SURE_ENOUGH`, and saving is a
-deliberate tap. Over sixty synthesised photographs - real handwritten digits
-composited into a rendered card, then put through perspective, shadow, blur,
-noise and JPEG - 57 read exactly right and all three misreadings came back with
-a row marked. Keep that last property: a wrong score saved without anyone
-noticing is worse than a reader that admits it is stuck. Synthesised cards are
-not photographs of real ones, so treat the figure as a regression baseline
-rather than a promise.
+confidence; rows below `SURE_ENOUGH` are marked, and rows the rules had to
+reconstruct are marked differently and say what the card appeared to read,
+because those are two different claims. Over sixty synthesised photographs -
+real handwritten digits composited into a rendered card, then put through
+perspective, shadow, blur, noise and JPEG - 58 read exactly right and both
+misreadings came back with a row marked. Keep that last property: a wrong score
+saved without anyone noticing is worse than a reader that admits it is stuck.
+Synthesised cards are not photographs of real ones, so treat the figure as a
+regression baseline rather than a promise.
 
-`vendor/opencv-4.9.0.js` is ten megabytes, so it is not in the service worker's
-install list. It is fetched the first time someone scans and cached from there,
-which is why `js/scan/opencv.js` loads it with a script tag: fetching it into
-the JavaScript heap first, to show a progress bar, runs the renderer out of
-memory. That module also deletes `cv.then` before resolving. Emscripten's module
-object is a thenable, so resolving a promise with it makes the promise machinery
-chase it forever and the tab stops responding - no error, nothing in the
-console, just a page that has stopped.
+`vendor/` holds an OpenCV built for this app rather than the one OpenCV ships -
+see `tools/README.md` for what is in it and how to rebuild it. It is 4.0 MB
+instead of 10.3 MB, and it is still kept out of the service worker's install
+list: it is fetched the first time someone scans and cached from there. Three
+things about loading it have already cost an afternoon each:
+
+- It must be loaded by URL, not fetched into a buffer first. Holding ten
+  megabytes of JavaScript in the heap while the browser decodes and compiles it
+  runs the renderer out of memory.
+- Importing it leaves a *promise* in `globalThis.cv`, and OpenCV's own helpers
+  reach for that global when they build a Mat, so the worker rebinds it to what
+  it resolved to.
+- It is built with SIMD, which Safari only gained in 16.4. `hasSimd()` asks the
+  engine directly by validating a module that uses a v128 instruction, so an old
+  phone gets a sentence explaining itself rather than a wasm that will not
+  instantiate.
 
 ## Two printed things, for different readers
 

@@ -69,15 +69,27 @@ can host the folder anywhere static (GitHub Pages, a USB stick, a laptop in the 
   tap; there is a button for when you would rather pick the moment, and *Choose a photo*
   for a picture you already took or a card scanned on a desktop.
 - Nothing is saved without being shown. The scores appear as ordinary editable fields,
-  the rows the reader was unsure of are marked, and it tells you if the *sets won* at the
-  foot of the card disagrees with the scores above it.
-- What makes it work is the rules: only a few readings of a blurred box make a legal set
-  that adds up to a finished match, so a 9 that looks like a 4 usually settles itself.
-  On a test set of sixty synthesised card photographs it read 57 exactly right and marked
-  a row on every one of the three it got wrong - but those are made-up photographs, so
-  give the scores a glance before you save.
-- The image library it needs is about 10 MB. It downloads the first time you scan and is
-  cached afterwards, so scanning works offline like everything else.
+  and it tells you if the *sets won* at the foot of the card disagrees with the scores
+  above it.
+- **What it does when a score is impossible.** A set ends at 11 with two clear points, so
+  a box reading 17-9 never happened - under ten on one side means exactly eleven on the
+  other - and neither did 16-16. When a score cannot be right the reader works out what it
+  must have been, using the rest of the card: if the match carried on, the set cannot have
+  been the one that ended it, which often settles who won it. A card reading 4-11, 6-11,
+  16-16, 9-11 had a fourth set played, so the third was won by the first player, and it was
+  either 18-16 or 16-14; the reader picks whichever the handwriting is closer to. Scores
+  worked out this way are **shown in blue with what the card actually read beside them**,
+  because they are the reader's reasoning rather than its reading — check those against the
+  card before saving.
+- On a test set of sixty synthesised card photographs it read 58 exactly right and marked a
+  row on both of the ones it got wrong - but those are made-up photographs, so give the
+  scores a glance before you save.
+- Reading happens on a background thread, so the viewfinder stays smooth and a tap always
+  lands. The OpenCV build it uses is compiled for this app - only the parts that read a
+  sheet of paper, with SIMD - which brings it from 10.3 MB down to 4.0 MB. It downloads the
+  first time you scan and is cached afterwards, so scanning works offline like everything
+  else. It needs a browser with WebAssembly SIMD: iOS 16.4 or newer, or any current
+  desktop browser.
 
 **Print it**
 - The print screen composes the whole tournament into one document: header, player list,
@@ -140,8 +152,8 @@ sw.js                   offline cache, named after the version
 js/i18n.js              translations; keys are the English strings themselves
 js/qr.js                QR encoder for the scorecard codes, level Q
 js/scan/                reading a filled-in card back: OpenCV, digit classifier, rules
-vendor/                 OpenCV, fetched only when a card is scanned
-tools/                  trains the digit classifier; not part of the app
+vendor/                 OpenCV, built for this app, fetched only when a card is scanned
+tools/                  builds the two generated things; not part of the app
 js/settings.js          language, view density and score entry preferences
 js/model.js             draw, schedule, scoring rules, standings, bracket
 js/store.js             local storage, export and import

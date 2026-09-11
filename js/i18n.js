@@ -334,6 +334,11 @@ const SV = {
   "This match already has a result. Saving replaces it.":
     "Matchen har redan ett resultat. Sparar du ersätts det.",
   "check": "kolla",
+  "card read {score}": "kortet läste {score}",
+  "A score in blue was not a possible one as written. The rules of the game say who had to win that set, and the closest reading of the card is shown — check it.":
+    "En siffra i blått var ingen möjlig ställning som den stod. Reglerna säger vem som måste ha vunnit setet, och den närmaste tolkningen av kortet visas — kontrollera den.",
+  "This browser is too old to read a scorecard. On an iPhone that means iOS 16.4 or newer.":
+    "Webbläsaren är för gammal för att läsa protokoll. På iPhone betyder det iOS 16.4 eller nyare.",
 };
 
 const DICTIONARIES = { en: {}, sv: SV };

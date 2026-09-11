@@ -12,7 +12,7 @@
  * takes its input flattened channel-major. Get that ordering wrong and the
  * network still runs, just badly - so it is spelled out rather than inferred.
  */
-import { c1w, c1b, c2w, c2b, fcw, fcb } from "./digit-model.js";
+import { c1w, c1b, c2w, c2b, fcw, fcb, CONFUSION } from "./digit-model.js";
 
 const CONV1 = { cin: 1, cout: 12, k: 5, in: 28, out: 24 };
 const POOL1 = 12;
@@ -96,58 +96,116 @@ export function classify(bitmap) {
   return softmax(scores);
 }
 
+/*
+ * How much of a digit's reading to take from the measured confusion matrix
+ * rather than from the network's own output.
+ *
+ * A softmax is badly calibrated at the tail: shown a 6 it will happily say
+ * 0.9997 for 6 and 1e-9 for 8, which is a claim about a written digit that no
+ * classifier is entitled to make. That matters here because the interesting
+ * question is never "what does this look like" - it is "the rules say this
+ * cannot be a 6, so what else could a 6-looking mark have been". Answering it
+ * from the tail of a softmax is answering it from noise. So a share of every
+ * distribution is replaced by what the network is actually observed to do with
+ * that digit, which is what makes 6 read as 8 outrank 6 read as 4.
+ */
+const MEASURED_SHARE = 0.12;
+
+/** P(the digit written was t | the network read s), from the confusion matrix. */
+const POSTERIOR = CONFUSION[0].map((_, said) => {
+  const column = CONFUSION.map((row) => row[said]);
+  const total = column.reduce((sum, value) => sum + value, 0);
+  return column.map((value) => value / total);
+});
+
+function temper(probs) {
+  let said = 0;
+  for (let i = 1; i < 10; i += 1) if (probs[i] > probs[said]) said = i;
+  const measured = POSTERIOR[said];
+  const out = new Float32Array(10);
+  for (let i = 0; i < 10; i += 1) out[i] = (1 - MEASURED_SHARE) * probs[i] + MEASURED_SHARE * measured[i];
+  return out;
+}
+
+/* What a reading costs when the segmentation itself was wrong: a blob that was
+   really two digits, or two marks that were really one. Both happen, and both
+   have to stay on the table for the rules to overrule. */
+const UNCUT = 0.3;
+const SPURIOUS = 0.05;
+const MISSED = 0.02;
+
 /**
- * Turns the digits of one score box into a distribution over the numbers it
- * could be.
+ * Reads one score box into distributions rather than an answer.
  *
- * A box holds nothing, one digit or two, and nothing is a real answer - an
- * unplayed set. Two digits multiply out into a number, and the probability
- * comes with them, which is what lets the rules later pick between two
- * readings that both look plausible.
- *
- * When the box had one blob of ink that had to be cut in two, both readings
- * are offered: the pair, and the uncut blob as a single digit. A nought cut
- * down the middle reads as a convincing 62, and no amount of looking at the
- * shape will settle it - but only one of the two makes a legal set, so the
- * rules settle it instead.
+ * Nothing here decides anything. A box holds nothing, one digit or two, and
+ * what comes back is what each position might have been - which is what lets
+ * the rules of the game, which know far more than this module does, do the
+ * deciding.
  *
  * @param {{ digits: Float32Array[], whole: Float32Array|null }} box
- * @returns {{ empty: boolean, options: Array<{ value: number, p: number }> }}
  */
 export function readBox(box) {
-  const bitmaps = box.digits;
-  if (!bitmaps.length) return { empty: true, options: [] };
+  if (!box.digits.length) return { empty: true, positions: [], whole: null, options: [] };
 
-  const perDigit = bitmaps.slice(0, 2).map(classify);
+  const positions = box.digits.slice(0, 2).map((bitmap) => temper(classify(bitmap)));
+  const whole = box.whole ? temper(classify(box.whole)) : null;
+  const reading = { empty: false, positions, whole, options: [] };
+
+  /* A ranked list of what the box appears to say, for showing the organiser
+     what was on the card when the rules end up overruling it. */
   const options = [];
-
-  if (perDigit.length === 1) {
-    perDigit[0].forEach((p, value) => options.push({ value, p }));
+  if (positions.length === 1) {
+    positions[0].forEach((p, value) => options.push({ value, p }));
   } else {
-    const [tens, units] = perDigit;
-    tens.forEach((pt, t) => {
-      /* A leading zero is not how anyone writes a score. */
-      if (t === 0) return;
-      units.forEach((pu, u) => options.push({ value: t * 10 + u, p: pt * pu }));
+    positions[0].forEach((pt, tens) => {
+      if (tens === 0) return; // nobody writes a leading zero
+      positions[1].forEach((pu, units) => options.push({ value: tens * 10 + units, p: pt * pu }));
     });
-    if (box.whole) {
-      /* The same ink read as one digit rather than two. */
-      classify(box.whole).forEach((p, value) => options.push({ value, p: p * UNCUT_WEIGHT }));
-    }
+    if (whole) whole.forEach((p, value) => options.push({ value, p: p * UNCUT }));
   }
-
-  /* Two readings can land on the same number; keep the better one. */
   const best = new Map();
   for (const option of options) {
     const seen = best.get(option.value);
     if (!seen || option.p > seen.p) best.set(option.value, option);
   }
-
-  const ranked = [...best.values()].sort((a, b) => b.p - a.p);
-  return { empty: false, options: ranked.slice(0, 12) };
+  reading.options = [...best.values()].sort((a, b) => b.p - a.p).slice(0, 8);
+  return reading;
 }
 
-/* How much weight the uncut reading keeps against the cut one. A cut that got
-   this far had a real gap down the middle, so the pair is the better guess -
-   but not by so much that the rules cannot overturn it. */
-const UNCUT_WEIGHT = 0.3;
+/**
+ * How likely it is that this box holds this number.
+ *
+ * The number is proposed from outside - by the rules, which know which scores
+ * a set can legally end on - and this says what the ink is worth as a reading
+ * of it. That includes readings where the segmentation was wrong: 11 written
+ * so the strokes touch comes back as one blob, and a nought with a wide loop
+ * comes back as two, so neither a shorter nor a longer number is ruled out,
+ * only made to pay for itself.
+ */
+export function scoreValue(box, value) {
+  if (box.empty || value < 0 || value > 99) return 0;
+  const text = String(value);
+  const wanted = [...text].map(Number);
+  const found = box.positions.length;
+
+  if (wanted.length === found) {
+    let p = 1;
+    for (let i = 0; i < wanted.length; i += 1) p *= box.positions[i][wanted[i]];
+    return p;
+  }
+
+  if (wanted.length === 1 && found === 2) {
+    /* One digit, read as two: either the uncut blob says so, or one of the two
+       pieces is the whole digit and the other was never ink. */
+    const uncut = box.whole ? box.whole[wanted[0]] * UNCUT : 0;
+    const piece = Math.max(box.positions[0][wanted[0]], box.positions[1][wanted[0]]) * SPURIOUS;
+    return Math.max(uncut, piece);
+  }
+
+  if (wanted.length === 2 && found === 1) {
+    /* Two digits, read as one: the other never made it out of the ruling. */
+    return Math.max(box.positions[0][wanted[0]], box.positions[0][wanted[1]]) * MISSED;
+  }
+
+  return 0;
+}

@@ -9,9 +9,11 @@
  * ruled lines themselves, so the card can be re-laid-out without breaking the
  * reader, and a card photographed at a slant reads the same as a flat scan.
  *
- * Everything OpenCV hands back is a Mat that has to be deleted by hand, so
- * every function here cleans up after itself and the few Mats that escape are
- * returned in an object with a close().
+ * This runs in a worker, so there is no DOM here: a frame arrives as raw RGBA
+ * bytes and leaves as numbers. Everything OpenCV hands back is a Mat that has
+ * to be deleted by hand, so every function here cleans up after itself, and
+ * the handful of Mats that live from one frame to the next are held in
+ * `scratch` and reused rather than reallocated thirty times a minute.
  */
 
 /* The card, in millimetres, as styles.css prints it. Only the width and the
@@ -32,8 +34,40 @@ const px = (mm) => Math.round(mm * PPM);
  * Small helpers over the OpenCV bindings
  * ------------------------------------------------------------------ */
 
-function grayscale(cv, src) {
-  const gray = new cv.Mat();
+/*
+ * The Mats that survive between frames.
+ *
+ * A viewfinder hands this module a frame every second or so, all the same
+ * size. Allocating and freeing the full-frame buffers each time is the one
+ * cost here that is pure waste - the work itself has to happen, but the
+ * allocation does not - so the three big ones are kept and refilled. The
+ * detector is kept for the same reason: constructing it reads tables.
+ */
+const scratch = { src: null, gray: null, ink: null, detector: null };
+
+/** Frees everything held between frames. Called when the reader shuts down. */
+export function release() {
+  for (const key of ["src", "gray", "ink"]) {
+    if (scratch[key]) scratch[key].delete();
+    scratch[key] = null;
+  }
+  if (scratch.detector && scratch.detector.delete) scratch.detector.delete();
+  scratch.detector = null;
+}
+
+/** A Mat over the frame's pixels, reusing the last one when it still fits. */
+function frameMat(cv, frame) {
+  const { width, height, data } = frame;
+  if (!scratch.src || scratch.src.cols !== width || scratch.src.rows !== height) {
+    if (scratch.src) scratch.src.delete();
+    scratch.src = new cv.Mat(height, width, cv.CV_8UC4);
+  }
+  scratch.src.data.set(data);
+  return scratch.src;
+}
+
+function grayscale(cv, src, reuse) {
+  const gray = reuse || new cv.Mat();
   if (src.channels() === 1) src.copyTo(gray);
   else cv.cvtColor(src, gray, src.channels() === 4 ? cv.COLOR_RGBA2GRAY : cv.COLOR_RGB2GRAY);
   return gray;
@@ -47,8 +81,8 @@ function grayscale(cv, src) {
  * sized from the image rather than fixed, since the same card arrives as a
  * 4000px photo or an 800px preview frame.
  */
-function inkMask(cv, gray, blockMm = 6) {
-  const out = new cv.Mat();
+function inkMask(cv, gray, blockMm = 6, reuse) {
+  const out = reuse || new cv.Mat();
   let block = Math.round((blockMm * gray.cols) / CARD_MM.width);
   block = Math.max(11, block | 1);
   cv.adaptiveThreshold(gray, out, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, block, 9);
@@ -237,7 +271,7 @@ function ruledCells(cv, flat, debug) {
   } finally {
     contours.delete();
     hierarchy.delete();
-    if (debug) debug.grid = toCanvas(cv, grid);
+    if (debug) debug.grid = pixels(cv, grid);
     grid.delete();
   }
   if (debug) debug.cells = cells.map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height }));
@@ -496,23 +530,23 @@ function digitsIn(cv, flat, rect) {
  * ------------------------------------------------------------------ */
 
 /**
- * Reads one photograph.
+ * Reads one frame.
  *
- * @param cv        the loaded OpenCV namespace
- * @param source    a canvas, image or ImageData holding the photo
- * @returns {{ ok: boolean, reason?: string, code?: number[], rows?: Array, flat?: HTMLCanvasElement }}
+ * @param cv      the loaded OpenCV namespace
+ * @param frame   { width, height, data } - raw RGBA, as ImageData carries it
+ * @returns {{ ok: boolean, reason?: string, code?: number[], rows?: Array }}
  */
-export function readCard(cv, source, { debug = false } = {}) {
+export function readCard(cv, frame, { debug = false } = {}) {
   const stages = debug ? {} : null;
-  const src = source instanceof cv.Mat ? source : cv.imread(source);
-  const scratch = [src];
-  const done = () => scratch.forEach((mat) => mat && !mat.isDeleted() && mat.delete());
+  const src = frameMat(cv, frame);
+  /* Only the Mats made here get freed; the ones in `scratch` outlive the call. */
+  const owned = [];
+  const done = () => owned.forEach((mat) => mat && !mat.isDeleted() && mat.delete());
 
   try {
-    const gray = grayscale(cv, src);
-    scratch.push(gray);
-    const ink = inkMask(cv, gray, 7);
-    scratch.push(ink);
+    scratch.gray = grayscale(cv, src, scratch.gray);
+    scratch.ink = inkMask(cv, scratch.gray, 7, scratch.ink);
+    const ink = scratch.ink;
 
     const candidates = anchorCandidates(cv, ink);
     if (candidates.length < 4) return { ok: false, reason: "anchors", stages };
@@ -520,40 +554,35 @@ export function readCard(cv, source, { debug = false } = {}) {
     if (!plausibleQuad(quad, ink)) return { ok: false, reason: "anchors", stages };
 
     const flat = squareUp(cv, src, quad);
-    scratch.push(flat);
+    owned.push(flat);
 
-    const detector = new cv.QRCodeDetector();
-    let text = "";
-    try {
-      text = detector.detectAndDecode(flat);
-    } finally {
-      if (detector.delete) detector.delete();
-    }
+    if (!scratch.detector) scratch.detector = new cv.QRCodeDetector();
+    const text = scratch.detector.detectAndDecode(flat);
     /* The payload is three raw bytes, not text, and comes back one character
        per byte. Anything else is a code from somewhere other than our card. */
     const code = text.length === 3 ? [...text].map((ch) => ch.charCodeAt(0) & 0xff) : null;
 
     const cells = ruledCells(cv, flat, stages);
     const grid = gridOf(cells, flat);
-    if (stages) stages.flat = toCanvas(cv, flat);
-    if (!grid) return { ok: false, reason: "boxes", code, flat: toCanvas(cv, flat), stages };
+    if (stages) stages.flat = pixels(cv, flat);
+    if (!grid) return { ok: false, reason: "boxes", code, stages };
 
     const rows = grid.map(([a, b]) => ({
       a: digitsIn(cv, flat, a),
       b: digitsIn(cv, flat, b),
     }));
 
-    if (stages) stages.grid = stages.grid || null;
-    return { ok: true, code, rows, flat: toCanvas(cv, flat), stages };
+    return { ok: true, code, rows, stages };
   } finally {
     done();
   }
 }
 
-function toCanvas(cv, mat) {
-  const canvas = document.createElement("canvas");
-  canvas.width = mat.cols;
-  canvas.height = mat.rows;
-  cv.imshow(canvas, mat);
-  return canvas;
+/** A Mat as plain RGBA bytes, for the test harness to look at. */
+function pixels(cv, mat) {
+  const rgba = new cv.Mat();
+  cv.cvtColor(mat, rgba, mat.channels() === 1 ? cv.COLOR_GRAY2RGBA : cv.COLOR_RGB2RGBA);
+  const out = { width: rgba.cols, height: rgba.rows, data: new Uint8ClampedArray(rgba.data) };
+  rgba.delete();
+  return out;
 }

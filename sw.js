@@ -32,7 +32,9 @@ const ASSETS = [
   "js/scan/digit-model.js",
   "js/scan/opencv.js",
   "js/scan/read.js",
+  "js/scan/reader.js",
   "js/scan/reconcile.js",
+  "js/scan/worker.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -57,10 +59,10 @@ self.addEventListener("activate", (event) => {
  * Navigations fall back to the cached shell; assets are cache-first with a
  * background refresh so a new deploy is picked up on the next visit.
  *
- * vendor/opencv.js is not in ASSETS on purpose - it is ten megabytes and only
- * the scorecard reader needs it - but it is cached here like anything else the
- * moment it is first fetched, which is what makes scanning work offline
- * afterwards.
+ * The two vendor/opencv files are not in ASSETS on purpose - they are 2.7 MB
+ * and only the scorecard reader needs them - but they are cached here like
+ * anything else the moment they are first fetched, which is what makes
+ * scanning work offline afterwards.
  */
 self.addEventListener("fetch", (event) => {
   const request = event.request;

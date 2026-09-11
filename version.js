@@ -7,4 +7,4 @@
  * sets a global rather than exporting - `self` is the window in the page and
  * the worker scope in the service worker.
  */
-self.APP_VERSION = "1.9.0";
+self.APP_VERSION = "1.10.0";

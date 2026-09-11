@@ -2,25 +2,33 @@
  * Turning what the classifier saw into a result the app will accept.
  *
  * A digit classifier on its own is a poor reader of scorecards, because the
- * boxes are not independent: a set ends at eleven with a two point margin, a
- * match stops the moment someone has enough sets, and every box after that is
- * blank. Those rules throw away the overwhelming majority of readings that a
- * per-digit guess would allow, so the reader does not pick each box on its own
- * and hope - it searches for the most likely reading of the whole card that
- * the rules would let an organiser type in by hand.
+ * boxes are not independent. A set ends at eleven with a two point margin, so
+ * 16-16 never happened and neither did 17-9: if one player is under ten the
+ * other has exactly eleven. A match stops the moment someone has enough sets,
+ * so a fourth set on the card proves nobody had won three after the third. And
+ * every box after the decisive set is blank.
  *
- * This is where most of the accuracy comes from. A 9 misread as a 4 in
- * isolation is usually settled by the fact that only one of them makes a legal
- * set, and the score that fell out of the search is the one the card must have
- * meant.
+ * Those rules throw away almost every reading a per-digit guess would allow, so
+ * the reader does not read each box and hope. It proposes every score a set can
+ * legally end on, asks the ink how much it likes each one, and searches for the
+ * most likely reading of the whole card that the rules permit.
+ *
+ * That is what lets it repair a box outright. Take a card reading 4-11, 6-11,
+ * 16-16, 9-11. The third set is impossible as written. Had player two won it
+ * the match would have finished there at 0-3, and yet a fourth set was played -
+ * so player one won the third, and it was either 18-16 or 16-14. The ink
+ * decides between those two, and a written 6 misread as an 8 is far commoner
+ * than one misread as a 4, so the card said 18-16. Nothing about that reasoning
+ * is available to a classifier looking at one box.
  */
 import { isValidSet, setsToWin } from "../model.js";
+import { scoreValue } from "./digits.js";
 
-/* What a box with nothing in it, or one side missing, is worth. Both are real
-   situations - an unplayed set, or a digit lost to a crease - so neither is
-   ruled out, but both are made expensive enough that a clean reading wins. */
-const UNREADABLE = 1e-3;
-const HALF_READ = 0.05;
+/* What a box with nothing in it is worth as a reading of a number. A set with
+   one side missing is a real situation - a digit lost to a crease - so it is
+   not ruled out, just made to pay, and every value costs the same because the
+   ink says nothing either way. */
+const SIDE_UNREAD = 0.02;
 
 /*
  * How believable a set score is, beyond being legal.
@@ -36,46 +44,49 @@ function plausibility(a, b, pointsPerSet) {
   return over <= 0 ? 1 : 0.1 ** over;
 }
 
-/** Every score a legal set can end on, when nothing readable narrows it down. */
-function anyLegalPair(pointsPerSet, p) {
-  const out = [];
-  for (let loser = 0; loser <= pointsPerSet + 8; loser += 1) {
+/**
+ * Every score a set can legally end on, worked out once per match length.
+ *
+ * There are only a few dozen: one side reaches the target with the other under
+ * it, or both climb past it two apart. Enumerating them and scoring each
+ * against the ink is both cheaper and better than reading the ink and hoping it
+ * lands on one, because it means an impossible reading has somewhere to go.
+ */
+const legalCache = new Map();
+
+function legalPairs(pointsPerSet) {
+  const hit = legalCache.get(pointsPerSet);
+  if (hit) return hit;
+
+  const pairs = [];
+  for (let loser = 0; loser <= pointsPerSet + 14; loser += 1) {
     const winner = loser >= pointsPerSet - 1 ? loser + 2 : pointsPerSet;
-    out.push({ a: winner, b: loser, p }, { a: loser, b: winner, p });
+    if (winner > 99) break;
+    if (isValidSet(winner, loser, pointsPerSet)) pairs.push([winner, loser], [loser, winner]);
   }
-  return out;
+  legalCache.set(pointsPerSet, pairs);
+  return pairs;
 }
 
 /**
- * Legal (a, b) pairs for one row, with the probability the reader gives each.
+ * Every legal score for one row, with what the ink thinks of each.
  * Returns null for a row with nothing written in it at all.
  */
 function pairsFor(row, pointsPerSet) {
   const { a, b } = row;
   if (a.empty && b.empty) return null; // an unplayed set
 
-  const legal = [];
-  const add = (valueA, valueB, p) => {
-    if (p <= 0 || !isValidSet(valueA, valueB, pointsPerSet)) return;
-    legal.push({ a: valueA, b: valueB, p: p * plausibility(valueA, valueB, pointsPerSet) });
-  };
+  const side = (box, value) => (box.empty ? SIDE_UNREAD : scoreValue(box, value));
 
-  if (!a.empty && !b.empty) {
-    for (const left of a.options) for (const right of b.options) add(left.value, right.value, left.p * right.p);
-  } else if (!a.empty) {
-    /* One side readable: the rules know what the other side can have been. */
-    for (const left of a.options) for (let value = 0; value <= left.value + 2; value += 1) add(left.value, value, left.p * HALF_READ);
-  } else {
-    for (const right of b.options) for (let value = 0; value <= right.value + 2; value += 1) add(value, right.value, right.p * HALF_READ);
-  }
-
-  /* Nothing the classifier offered is a legal set. Fall back to every score a
-     set can end on, so the search still has something to work with and the
-     organiser gets a row to correct rather than a dead end. */
-  if (!legal.length) return anyLegalPair(pointsPerSet, UNREADABLE);
-
-  legal.sort((x, y) => y.p - x.p);
-  return legal.slice(0, 40);
+  return legalPairs(pointsPerSet)
+    .map(([left, right]) => ({
+      a: left,
+      b: right,
+      p: side(a, left) * side(b, right) * plausibility(left, right, pointsPerSet),
+    }))
+    /* Nothing is impossible, only expensive: a floor keeps a set the reader
+       completely failed on from collapsing the search for the whole card. */
+    .map((pair) => ({ ...pair, p: Math.max(pair.p, 1e-12) }));
 }
 
 /**
@@ -116,12 +127,18 @@ function search(rowPairs, settings, forbid) {
   return best;
 }
 
+/** What a row appears to say, before the rules get to it. */
+function asRead(row) {
+  const top = (box) => (box.empty || !box.options.length ? null : box.options[0].value);
+  return [top(row.a), top(row.b)];
+}
+
 /**
  * Reads the rows of one card.
  *
  * @param rows      per-row box readings from digits.readBox
  * @param settings  the tournament's bestOf and pointsPerSet
- * @returns {{ ok, sets, confidence, setsWon, error }}
+ * @returns {{ ok, sets, confidence, inferred, error }}
  */
 export function reconcile(rows, settings) {
   /* Every row after the last one with ink in it is an unplayed set: the card
@@ -129,26 +146,16 @@ export function reconcile(rows, settings) {
   const perRow = rows.map((row) => pairsFor(row, settings.pointsPerSet));
   let last = perRow.length - 1;
   while (last >= 0 && perRow[last] === null) last -= 1;
-  if (last < 0) return { ok: false, error: "blank", sets: [], confidence: [] };
+  if (last < 0) return { ok: false, error: "blank", sets: [], confidence: [], inferred: [] };
 
-  /*
-   * A blank row with written rows after it is a set the reader failed to see,
-   * not one that was never played, so the rules fill it in instead.
-   *
-   * Every row also keeps every legal score as a long-odds option. Without it a
-   * single badly misread box that still happens to form a legal set - 5-11
-   * where the card says 15-17 - makes the whole card unreadable, because no
-   * combination of the remaining choices adds up to a finished match. With it
-   * the search can overrule that one box, and the row comes back flagged for
-   * the organiser instead of the card coming back as a failure.
-   */
-  const escape = anyLegalPair(settings.pointsPerSet, UNREADABLE);
+  /* A blank row with written rows after it is a set the reader failed to see,
+     not one that was never played, so the rules fill it in from nothing. */
   const played = perRow
     .slice(0, last + 1)
-    .map((pairs) => (pairs ? [...pairs, ...escape] : [...escape]));
+    .map((pairs) => pairs || legalPairs(settings.pointsPerSet).map(([a, b]) => ({ a, b, p: SIDE_UNREAD * SIDE_UNREAD })));
 
   const best = search(played, settings, null);
-  if (!best) return { ok: false, error: "illegal", sets: [], confidence: [] };
+  if (!best) return { ok: false, error: "illegal", sets: [], confidence: [], inferred: [] };
 
   /* How sure the reader is about each row: how much worse the best reading of
      the whole card gets if that row is forced to say something else. */
@@ -158,10 +165,20 @@ export function reconcile(rows, settings) {
     return 1 / (1 + Math.exp(alternative.logp - best.logp));
   });
 
+  /* Rows where the rules overruled the ink. These are the reader's own
+     reasoning rather than its reading, so the screen says so. */
+  const inferred = [];
+  best.picks.forEach((pick, row) => {
+    const read = asRead(rows[row]);
+    if (read[0] === pick.a && read[1] === pick.b) return;
+    inferred.push({ row, read, chosen: [pick.a, pick.b] });
+  });
+
   return {
     ok: true,
     sets: best.picks.map((pick) => [pick.a, pick.b]),
     confidence,
+    inferred,
     error: null,
   };
 }
