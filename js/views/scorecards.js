@@ -204,17 +204,20 @@ let printed = null;
 /*
  * The card is drawn at its real size in millimetres, which is wider than a
  * phone. On screen the preview is zoomed down to fit; zoom rather than a
- * transform, so the page height follows. Printing always uses full size.
+ * transform, so the page height follows. The zoom is applied through a custom
+ * property that only a screen media query reads, so printing never sees it.
  */
 function fitPreview() {
   const list = document.querySelector(".scards");
   if (!list) return;
-  list.style.zoom = "1";
+  list.style.removeProperty("--preview-zoom");
   const card = list.querySelector(".scard");
   if (!card) return;
   const available = list.clientWidth;
   const natural = card.getBoundingClientRect().width;
-  if (natural > available && available > 0) list.style.zoom = String(Math.max(0.25, available / natural));
+  if (natural > available && available > 0) {
+    list.style.setProperty("--preview-zoom", String(Math.max(0.25, available / natural)));
+  }
 }
 
 let watchingResize = false;
