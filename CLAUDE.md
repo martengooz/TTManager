@@ -126,7 +126,7 @@ The regression baselines are sixty synthesised photographs of a card filling
 the frame, and six of a whole A4 sheet held at arm's length, which is how a
 printed protocol actually reaches a camera. Both use real handwritten digits
 composited into a rendered card and put through perspective, shadow, blur,
-noise and JPEG. They currently read 54/60 and 6/6. Treat those as a baseline to
+noise and JPEG. They currently read 57/60 and 6/6. Treat those as a baseline to
 not regress rather than as a promise: synthesised cards are not photographs of
 real ones, and the first six real photographs taken of a printed card found
 three separate failures that sixty synthetic ones had not.
@@ -146,6 +146,23 @@ printed card:
 - Four marks at the corners of a rectangle look identical upside down, and no
   geometry distinguishes them. The QR code does, because it only decodes one
   way up.
+
+Two more came out of the first photographs of a card with the larger marks, and
+both are about the digits rather than the card:
+
+- `digitsIn` insets the crop sideways but barely at top and bottom. A box's
+  side rules are tall and thin, which is the shape of a 1, so they have to go;
+  its top and bottom rules are wide and thin, which nothing is, and the
+  component filter drops them anyway. Insetting all four sides equally cut a
+  tenth off each end of the box, and what lives there is the serif along the
+  foot of a European 1 - the one mark distinguishing it from a 7. That did not
+  make the 1 hard to read, it made it *be* a 7.
+- MNIST was collected in the United States, where a 1 is a bare vertical. A
+  Swedish umpire writes it with a flag up to the left and a serif along the
+  foot, and often crosses a 7. `continentalise` in the training script draws
+  those on, and draws the flag and the serif together most of the time -
+  separately, the network sees a stem with a serif and calls it the bottom of a
+  2, which is a fair reading of what it was shown.
 
 `vendor/` holds an OpenCV built for this app rather than the one OpenCV ships -
 see `tools/README.md` for what is in it and how to rebuild it. It is 4.0 MB
