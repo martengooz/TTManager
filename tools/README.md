@@ -17,6 +17,19 @@ downloads rather than arriving base64'd inside the JavaScript.
 Keep the whitelist in step with `card.js`. A call that is not in it is not in
 the build, and the failure is a `TypeError` at the moment someone scans a card.
 
+It is also about twice as fast. Reading the same six cards through the same
+pipeline, a card at a time:
+
+| Build | Per card | Download |
+| --- | --- | --- |
+| this one, trimmed with SIMD | 342-409ms, mean 384ms | 4.0 MB |
+| OpenCV's own `opencv.js` | 792-876ms, mean 833ms | 10.3 MB |
+
+Both read all six correctly, so it is like for like. Most of that is SIMD
+rather than the trimming - a narrower build is smaller, not quicker - and the
+gap matters because it is the difference between a viewfinder that tries twice
+a second and one that tries once.
+
 To rebuild, with [emsdk](https://emscripten.org) 3.1.64 and OpenCV 4.9.0:
 
 ```sh
