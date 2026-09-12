@@ -709,13 +709,28 @@ function splitWide(cv, mask, rect) {
  * than a threshold on a shape.
  */
 function digitsIn(cv, flat, rect) {
-  /* Step inside the ruling: a border caught in the crop becomes a stroke. */
-  const inset = Math.max(2, Math.round(rect.height * 0.12));
+  /*
+   * Step inside the ruling, but only sideways.
+   *
+   * A box's left and right rules are tall and thin, which is the shape of a 1,
+   * so they have to be cropped away or they get read as digits. Its top and
+   * bottom rules are wide and thin, which nothing is, and the component filter
+   * below discards them on its own.
+   *
+   * That difference matters more than it sounds. Insetting top and bottom by
+   * the same amount cost a tenth of the box height at each end, and what lives
+   * there is the serif along the foot of a European 1 - the one mark that
+   * distinguishes it from a 7. Cropping it off did not make the 1 hard to
+   * read; it made it genuinely be a 7, and no classifier was ever going to
+   * recover from that.
+   */
+  const insetX = Math.max(2, Math.round(rect.height * 0.12));
+  const insetY = Math.max(1, Math.round(rect.height * 0.04));
   const box = new cv.Rect(
-    Math.max(0, rect.x + inset),
-    Math.max(0, rect.y + inset),
-    Math.max(1, Math.min(rect.width - inset * 2, flat.cols - rect.x - inset)),
-    Math.max(1, Math.min(rect.height - inset * 2, flat.rows - rect.y - inset))
+    Math.max(0, rect.x + insetX),
+    Math.max(0, rect.y + insetY),
+    Math.max(1, Math.min(rect.width - insetX * 2, flat.cols - rect.x - insetX)),
+    Math.max(1, Math.min(rect.height - insetY * 2, flat.rows - rect.y - insetY))
   );
   if (box.width < 8 || box.height < 8) return { digits: [], whole: null };
 

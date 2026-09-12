@@ -103,15 +103,130 @@ def thicken(batch, amount):
     return (batch * (1 - blend) + out * blend).astype(np.float32)
 
 
-def augment(batch):
+def renormalise(batch, which):
+    """
+    Puts a digit back the way MNIST has it: ink scaled so its longest side is
+    20 pixels, centred by its centre of mass in a 28x28 field.
+
+    This is exactly what card.js does to a digit it has cut out of a box, and
+    the decorations below change a glyph's size and balance enough that without
+    it the training set would drift away from what the reader actually sees.
+    Only the decorated ones need it, which is what keeps it cheap.
+    """
+    for i in np.flatnonzero(which):
+        image = batch[i]
+        ys, xs = np.where(image > 0.1)
+        if not len(ys):
+            continue
+        crop = image[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+        h, w = crop.shape
+        scale = 20.0 / max(h, w)
+        nh, nw = max(1, int(round(h * scale))), max(1, int(round(w * scale)))
+        small = crop[np.clip(np.round((np.arange(nh) + 0.5) / scale - 0.5), 0, h - 1).astype(int)][
+            :, np.clip(np.round((np.arange(nw) + 0.5) / scale - 0.5), 0, w - 1).astype(int)
+        ]
+        total = small.sum()
+        if total <= 0:
+            continue
+        cy = float((small.sum(axis=1) @ np.arange(nh)) / total)
+        cx = float((small.sum(axis=0) @ np.arange(nw)) / total)
+        oy, ox = int(round(14 - cy)), int(round(14 - cx))
+
+        ty0, tx0 = max(0, oy), max(0, ox)
+        ty1, tx1 = min(28, oy + nh), min(28, ox + nw)
+        if ty1 <= ty0 or tx1 <= tx0:
+            continue
+        batch[i] = 0
+        batch[i, ty0:ty1, tx0:tx1] = small[ty0 - oy:ty1 - oy, tx0 - ox:tx1 - ox]
+    return batch
+
+
+def stroke(image, x0, y0, x1, y1, weight):
+    """Draws a straight pen stroke, anti-aliased, onto a 28x28 field."""
+    steps = int(max(abs(x1 - x0), abs(y1 - y0)) * 2) + 2
+    for step in range(steps + 1):
+        t = step / steps
+        x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                px, py = int(round(x)) + dx, int(round(y)) + dy
+                if not (0 <= px < 28 and 0 <= py < 28):
+                    continue
+                fade = max(0.0, 1.0 - (abs(x - px) + abs(y - py)) / 1.6)
+                image[py, px] = max(image[py, px], weight * fade)
+
+
+def continentalise(batch, labels, rng):
+    """
+    Teaches the network the way most of Europe writes.
+
+    MNIST was collected in the United States, where a 1 is a bare vertical
+    stroke. A Swedish umpire writes it with a flag up to the left and a serif
+    along the bottom, which to a network trained on MNIST is a 7 - and that is
+    not a hypothesis, it is what the first photographs of a filled-in card off
+    a real printer came back with. A 7 is often written with a crossbar here
+    too, which MNIST also does not have.
+
+    Both are simple shapes added to the digits that have them, and adding them
+    is far cheaper than finding a Nordic handwriting corpus.
+    """
+    out = batch.copy()
+    touched = np.zeros(len(batch), dtype=bool)
+    for i, digit in enumerate(labels):
+        if digit not in (1, 7):
+            continue
+        ys, xs = np.where(out[i] > 0.15)
+        if len(ys) < 8:
+            continue
+        top, bottom = ys.min(), ys.max()
+        weight = float(out[i].max())
+
+        if digit == 1:
+            # the stem, taken near the foot where a 1 is just the upright
+            foot = xs[ys > bottom - max(2, (bottom - top) // 4)]
+            stem = float(foot.mean()) if len(foot) else float(xs.mean())
+            roll = rng.random()
+            # The flag and the foot serif are one way of writing the digit, not
+            # two independent ornaments, so most of the time they arrive
+            # together. Drawn separately the network sees a stem with a serif,
+            # decides that is the bottom of a 2, and is not wrong to.
+            flag = roll < 0.72
+            serif = roll < 0.6 or (0.72 <= roll < 0.85)
+            if flag:
+                stroke(out[i], stem, top + rng.uniform(0, 1.5),
+                       stem - rng.uniform(3, 6), top + rng.uniform(3.5, 7), weight)
+                touched[i] = True
+            if serif:
+                half = rng.uniform(3.5, 6)
+                tilt = rng.uniform(-1, 1)
+                stroke(out[i], stem - half, bottom - rng.uniform(0, 1) + tilt,
+                       stem + half, bottom - rng.uniform(0, 1) - tilt, weight)
+                touched[i] = True
+        else:
+            if rng.random() < 0.4:   # the crossed seven
+                middle = (top + bottom) / 2
+                row = xs[(ys > middle - 2) & (ys < middle + 2)]
+                centre = float(row.mean()) if len(row) else float(xs.mean())
+                half = rng.uniform(2.5, 4.5)
+                stroke(out[i], centre - half, middle + rng.uniform(-1, 1),
+                       centre + half, middle + rng.uniform(-1, 1), weight)
+                touched[i] = True
+    return out, touched
+
+
+def augment(batch, labels):
     """
     Umpires do not write like the MNIST panel. They write in a ruled box with a
-    biro, at a slant, in whatever thickness the pen gives - so the training set
-    is stretched over rotation, scale, shear and stroke weight. It is the single
+    biro, at a slant, in whatever thickness the pen gives - and, here, with
+    European 1s and 7s - so the training set is stretched over rotation, scale,
+    shear, stroke weight and the shapes of those two digits. It is the single
     thing that moves the reader from working on clean scans to working on a
     photograph of a card that has been in someone's pocket.
     """
     n = len(batch)
+    batch, touched = continentalise(batch, labels, rng)
+    batch = renormalise(batch, touched)
+
     angle = rng.normal(0, 0.16, n).astype(np.float32)        # about +-9 degrees
     scale = rng.uniform(0.82, 1.18, n).astype(np.float32)
     shear = rng.normal(0, 0.22, n).astype(np.float32)        # a sloping hand
@@ -278,7 +393,7 @@ def confusion(net, x, y, passes=20, batch=1000):
         order = rng.permutation(len(x))
         for i in range(0, len(order), batch):
             pick = order[i:i + batch]
-            guess = net.forward(augment(x[pick]).reshape(-1, 1, 28, 28)).argmax(axis=1)
+            guess = net.forward(augment(x[pick], y[pick]).reshape(-1, 1, 28, 28)).argmax(axis=1)
             np.add.at(counts, (y[pick], guess), 1)
     return counts / counts.sum(axis=1, keepdims=True)
 
@@ -366,7 +481,7 @@ def main():
         loss_sum, seen = 0.0, 0
         for i in range(0, len(order) - args.batch + 1, args.batch):
             pick = order[i:i + args.batch]
-            xb = augment(train_x[pick]).reshape(-1, 1, 28, 28)
+            xb = augment(train_x[pick], train_y[pick]).reshape(-1, 1, 28, 28)
             yb = train_y[pick]
 
             probs = softmax(net.forward(xb))
